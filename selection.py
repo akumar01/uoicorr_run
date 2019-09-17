@@ -2,7 +2,7 @@ import numpy as np
 import pdb
 import itertools
 import time
-
+from utils import selection_accuracy
 from info_criteria import GIC, eBIC, gMDL, empirical_bayes
 from aBIC import aBIC, mBIC
 from sklearn.metrics import r2_score
@@ -19,26 +19,30 @@ class Selector():
         # Common operations to all
         n_samples, n_features = X.shape
 
-        # Fit OLS models
-        OLS_solutions = np.zeros(soltions.shape)
+        # # Fit OLS models
+        # OLS_solutions = np.zeros(soltions.shape)
 
-        for i in range(solutions.shape[0]):
-            support = solutions[i, :].astype(bool)
-            linmodel = LinearRegression(fit_intercept=False)
-            linmodel.fit(X[:, support], y)
-            OLS_solutions[i, support] = linmodel.coef_
+        # for i in range(solutions.shape[0]):
+        #     support = solutions[i, :].astype(bool)
+        #     linmodel = LinearRegression(fit_intercept=False)
+        #     linmodel.fit(X[:, support], y)
+        #     OLS_solutions[i, support] = linmodel.coef_
 
-        y_pred = OLS_solutions @ X.T + intercept
+        y_pred = solutions @ X.T + intercept
 
         # Deal to the appropriate sub-function based on 
         # the provided selection method string
 
         if self.selection_method in ['mBIC', 'eBIC', 'BIC', 'AIC',
                                        'gMDL', 'empirical_bayes']:
-            sdict = self.selector(X, y, y_pred, OLS_solutions, 
+            sdict = self.selector(X, y, y_pred, solutions, 
                                   reg_params)
+        elif self.selection_method == 'oracle'
+        
+            sdict = self.selector(solutions, reg_params, true_model)
+
         elif self.selection_method == 'aBIC':
-            sdict = self.aBIC_selector(X, y, OLS_solutions, 
+            sdict = self.aBIC_selector(X, y, solutions, 
                                        reg_params, true_model)
         else:
             raise ValueError('Incorrect selection method specified')
@@ -78,10 +82,20 @@ class Selector():
                    for i in range(solutions.shape[0])])
             sidx = np.argmin(scores[:, 0])
             sdict['effective_penalty'] = scores[sidx, 1]
+
         # Selection dict: Return coefs and selected_reg_param
-        
         sdict['coefs'] = solutions[sidx, :]
         sdict['reg_param'] = reg_params[sidx]
+        return sdict
+
+    def oracle_selector(self, solutions, reg_params, true_model):
+        # Quickly return the best selection accuracy
+        selection_acuracies = selection_accuracy(true_model.ravel(), solutions)
+        sidx = np.argmax(selection_accuracies)
+
+        sdict['coefs'] = solutions[sidx, :]
+        sdict['reg_param'] = reg_params[sidx]
+
         return sdict
 
     def aBIC_selector(self, X, y, solutions, reg_params, true_model):
@@ -123,6 +137,9 @@ class UoISelector(Selector):
         elif self.selection_method in ['BIC', 'AIC', 'mBIC',
                                        'eBIC', 'gMDL', 'empirical_bayes']: 
             sdict = self.selector(X, y)
+        elif select.selection_method == 'oracle':
+            sdict = self.oracle_selector(true_model)
+
         elif self.selection_method == 'aBIC':
             sdict = self.aBIC_selector(X, y, true_model)
         else:
@@ -183,6 +200,31 @@ class UoISelector(Selector):
 
             sdict_ = super(UoISelector, self).selector(yy, y_pred, solutions[boot, ...], 
                                                            np.arange(n_supports)) 
+
+            selected_coefs[boot, :] = sdict_['coefs']
+
+        coefs = self.union(selected_coefs)
+        sdict = {}
+        sdict['coefs'] = coefs
+
+        return sdict
+
+    def oracle_selector(self, true_model):
+        # Simply return the maximum selection accuracy available
+
+        solutions = self.uoi.estimates_
+        intercepts = self.uoi.intercepts_
+        assert(np.all(intercepts == 0))
+        boots = self.uoi.boots
+
+        n_boots, n_supports, n_coefs = solutions.shape
+        selected_coefs = np.zeros((n_boots, n_coefs))
+
+        for boot in range(n_boots):
+
+            sdict_ = super(UoISelector, self).oracle_selector(solutions[boot, ...], 
+                                                              np.arange(n_supports),
+                                                              true_model) 
 
             selected_coefs[boot, :] = sdict_['coefs']
 
