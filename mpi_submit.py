@@ -85,7 +85,7 @@ def gen_data_(params, subcomm, subrank):
     params['sigma'] = sigma
     params['betas'] = beta      
 
-    # If all betas end up zero for this sparsity level, output a warning and skip 
+    # If all betas end up zero for this sparsity level, output a warning and skip
     # this iteration (Make sure all ranks are instructed to continue!)
     if np.count_nonzero(beta) == 0:
         print('Warning, all betas were 0!')
@@ -130,6 +130,8 @@ def main(args):
     total_tasks = len(f.index)
 
     n_features = f.header['n_features']
+    selection_methods = f.header['selection_methods']
+    fields = f.header['fields']
 
     exp_type = args.exp_type
     results_dir = args.results_dir
@@ -186,11 +188,18 @@ def main(args):
 
         exp_results = exp.run(X, y, params, selection_methods)
         if subrank == 0:
+            results_dict = init_results_container(selection_methods)
 
-            # Directly save exp_results
+            #### Calculate and log results for each selection method
+            for selection_method in selection_methods:
+
+                for field in fields[selection_method]:
+                    results_dict[selection_method][field] = calc_result(X, X_test, y, y_test,
+                                                                           params['betas'].ravel(), field,
+                                                                           exp_results[selection_method])
 
             # Add results to results manager. This automatically saves the child's data
-            rmanager.add_child(exp_results, idx = chunk_param_list[chunk_idx][i])
+            rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
             print('Process group %d completed outer loop %d/%d' % (rank, i, num_tasks))
             print(time.time() - start)
 
