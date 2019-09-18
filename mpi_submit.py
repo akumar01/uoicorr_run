@@ -85,7 +85,7 @@ def gen_data_(params, subcomm, subrank):
     params['sigma'] = sigma
     params['betas'] = beta      
 
-    # If all betas end up zero for this sparsity level, output a warning and skip
+    # If all betas end up zero for this sparsity level, output a warning and skip 
     # this iteration (Make sure all ranks are instructed to continue!)
     if np.count_nonzero(beta) == 0:
         print('Warning, all betas were 0!')

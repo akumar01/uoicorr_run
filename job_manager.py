@@ -19,6 +19,25 @@ from misc import group_dictionaries, unique_obj
 
 from job_utils.idxpckl import Indexed_Pickle
 
+# Go through the iter param list and strip away any entries that do not 
+# pass validations. 
+def validate_params(iter_param_list):
+
+    bad_idxs = []
+
+    for i, param in enumerate(iter_param_list):
+        # Make sure that betas are not all zero
+        n_nonzero_beta = int(param['sparsity'] * \
+                             param['cov_params']['block_size'])
+        if n_nonzero_beta == 0:
+            bad_idxs.append(i)
+
+    # Delete the bad indices
+    for idx in sorted(bad_idxs, reverse=True):
+        del iter_param_list[idx]
+
+    return iter_param_list
+
 # Take two integers and generate a unique, single integer from them
 def gen_seed(i, j, dimi, dimj):
     # i_list = list(map(int, str(i)))
@@ -124,6 +143,9 @@ def generate_arg_files(argfile_array, jobdir):
                 n_samples = int(param_comb['np_ratio'] * param_comb['n_features'])
                 param_comb['n_samples'] = n_samples
 
+        # trim away parameter combinations that do not pass validation (i.e. all betas end up being 0)
+        iter_param_list = validate_params(iter_param_list)
+
         # Make n_reps independent copies of iter_param_list
         iter_param_list = [deepcopy(iter_param_list) for _ in range(arg_['reps'])]
         iter_param_list = [elem for sublist in iter_param_list for elem in sublist]
@@ -133,7 +155,8 @@ def generate_arg_files(argfile_array, jobdir):
             seed = gen_seed(i, j, len(iter_param_list), len(argfile_array))
             param_comb['seed'] = seed
             seeds.append(seed)
-            
+        
+
         ntasks.append(len(iter_param_list))
         arg_file = '%s/master/params%d.dat' % (jobdir, j)
         paths.append(arg_file)
