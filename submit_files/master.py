@@ -64,7 +64,7 @@ comm_params = {
 'n_features' : n_features,
 # n/p ratio #
 'np_ratio': 5,
-'selection_methods': ['BIC', 'AIC', 'CV', 'gMDL', 'empirical_bayes', 'oracle'],
+'est_score' : 'BIC'
 'reps' : 20,
 'stability_selection' : [1.0],
 'n_boots_sel': 25,
@@ -83,3 +83,16 @@ comm_params['n_alphas'] = 100
 comm_params['gamma'] = [3]
 
 ###############################################################
+
+# Which selection methods should we apply to the algorithms?
+comm_params['selection_methods'] = ['BIC', 'AIC', 'CV', 'mBIC', 'gMDL', 'empirical_bayes', 'oracle']
+# Which fields should we record for each selection method? 
+comm_params['fields'] = {'BIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
+						 'AIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
+						 'CV' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
+                         'mBIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
+                         'gMDL' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'effective_penalty'],
+                         'empirical_bayes' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 
+                                              'effective_penalty'], 
+                         'oracle' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param']}
+
