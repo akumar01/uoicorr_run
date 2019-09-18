@@ -37,7 +37,7 @@ class Selector():
                                        'gMDL', 'empirical_bayes']:
             sdict = self.selector(X, y, y_pred, solutions, 
                                   reg_params)
-        elif self.selection_method == 'oracle'
+        elif self.selection_method == 'oracle':
         
             sdict = self.selector(solutions, reg_params, true_model)
 

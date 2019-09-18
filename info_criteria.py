@@ -1,7 +1,7 @@
 import numpy as np
 from pyuoi.utils import log_likelihood_glm
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScalaer
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 from scipy.special import xlogy
 import scipy

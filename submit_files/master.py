@@ -64,7 +64,7 @@ comm_params = {
 'n_features' : n_features,
 # n/p ratio #
 'np_ratio': 5,
-'est_score' : 'BIC'
+'est_score' : 'BIC',
 'reps' : 20,
 'stability_selection' : [1.0],
 'n_boots_sel': 25,
