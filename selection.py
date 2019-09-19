@@ -2,6 +2,7 @@ import numpy as np
 import pdb
 import itertools
 import time
+from mpi_utils.ndarray import Gatherv_rows
 from utils import selection_accuracy
 from info_criteria import GIC, eBIC, gMDL, empirical_bayes
 from aBIC import aBIC, mBIC
@@ -124,10 +125,17 @@ class Selector():
 
 class UoISelector(Selector):
 
-    def __init__(self, uoi, selection_method = 'CV'):
+    def __init__(self, uoi, selection_method = 'CV', comm=None):
 
         super(UoISelector, self).__init__(selection_method)
         self.uoi = uoi
+        self.comm = comm
+        if comm is not None:
+            self.rank = comm.rank
+            self.size = comm.size
+        else:
+            self.rank = 0
+            self.size = 1
 
     # Perform the UoI Union operation (median)
     def union(self, selected_solutions):
@@ -173,9 +181,13 @@ class UoISelector(Selector):
         boots = self.uoi.boots
 
         n_boots, n_supports, n_coefs = solutions.shape
-        scores = np.zeros((n_boots, n_supports))
+        # Distribute bootstraps across ranks
+        tasks = np.arange(n_boots)
+        chunked_tasks = np.array_split(tasks, self.size)
+        task_list = chunked_tasks[self.rank]
+        scores = np.zeros((len(task_list), n_supports))
 
-        for boot in range(n_boots):
+        for boot in task_list:
             # Test data
             xx = X[boots[1][boot], :]
             yy = y[boots[1][boot]]  
@@ -183,13 +195,22 @@ class UoISelector(Selector):
 
             scores[boot, :] = np.array([r2_score(yy, y_pred[j, :]) for j in range(n_supports)])
 
-        selected_idxs = np.argmax(scores, axis = 1)
-        coefs = self.union(solutions[np.arange(n_boots), selected_idxs])
+        # Gather 
+        if self.comm is not None:
+            scores = Gatherv_rows(scores, self.comm)
 
-        # Return just the coefficients that result
-        sdict = {}
-        sdict['scores'] = scores
-        sdict['coefs'] = coefs
+        if self.rank == 0:
+
+            selected_idxs = np.argmax(scores, axis = 1)
+            coefs = self.union(solutions[np.arange(n_boots), selected_idxs])
+
+            # Return just the coefficients that result
+            sdict = {}
+            sdict['scores'] = scores
+            sdict['coefs'] = coefs
+
+        else: 
+            sdict = None
 
         return sdict
 
@@ -199,10 +220,15 @@ class UoISelector(Selector):
         intercepts = self.uoi.intercepts_
         boots = self.uoi.boots
         n_boots, n_supports, n_coefs = solutions.shape
-        selected_coefs = np.zeros((n_boots, n_coefs))
 
-        for boot in range(n_boots):
+        # Distribute bootstraps across ranks
+        tasks = np.arange(n_boots)
+        chunked_tasks = np.array_split(tasks, self.size)
+        task_list = chunked_tasks[self.rank]
 
+        selected_coefs = np.zeros((len(task_list), n_coefs))
+
+        for boot in task_list:
             # Train data
             xx = X[boots[0][boot], :]
             yy = y[boots[0][boot]]
@@ -214,9 +240,16 @@ class UoISelector(Selector):
 
             selected_coefs[boot, :] = sdict_['coefs']
 
-        coefs = self.union(selected_coefs)
-        sdict = {}
-        sdict['coefs'] = coefs
+        # Gather selected_coefs
+        if self.comm is not None:
+            selected_coefs = Gatherv_rows(selected_coefs, self.comm)
+
+        if self.rank = 0:
+            coefs = self.union(selected_coefs)
+            sdict = {}
+            sdict['coefs'] = coefs
+        else:
+            sdict = None
 
         return sdict
 
@@ -229,9 +262,15 @@ class UoISelector(Selector):
         boots = self.uoi.boots
 
         n_boots, n_supports, n_coefs = solutions.shape
-        selected_coefs = np.zeros((n_boots, n_coefs))
 
-        for boot in range(n_boots):
+        # Distribute bootstraps across ranks
+        tasks = np.arange(n_boots)
+        chunked_tasks = np.array_split(tasks, self.size)
+        task_list = chunked_tasks[self.rank]
+
+        selected_coefs = np.zeros((len(task_list), n_coefs))
+
+        for boot in task_list:
 
             sdict_ = super(UoISelector, self).oracle_selector(solutions[boot, ...], 
                                                               np.arange(n_supports),
@@ -239,9 +278,22 @@ class UoISelector(Selector):
 
             selected_coefs[boot, :] = sdict_['coefs']
 
-        coefs = self.union(selected_coefs)
-        sdict = {}
-        sdict['coefs'] = coefs
+        # Gather 
+        if self.comm is not None:
+            scores = Gatherv_rows(scores, self.comm)
+
+        if self.rank == 0:
+
+            selected_idxs = np.argmax(scores, axis = 1)
+            coefs = self.union(solutions[np.arange(n_boots), selected_idxs])
+
+            # Return just the coefficients that result
+            sdict = {}
+            sdict['scores'] = scores
+            sdict['coefs'] = coefs
+
+        else: 
+            sdict = None
 
         return sdict
 
