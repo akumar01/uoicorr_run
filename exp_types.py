@@ -52,7 +52,7 @@ class CV_Lasso(StandardLM_experiment):
 
     @classmethod
     def fit_and_select(self, X, y, selection_method, true_model): 
-
+        t0 = time.time()
         # Use the pycassocv for Lasso
         if selection_method == 'CV': 
             print('Fitting!')
@@ -77,7 +77,7 @@ class CV_Lasso(StandardLM_experiment):
             sdict = selector.select(self.fitted_estimator.coef_, 
                                     self.alphas, X, y, true_model)
             self.results[selection_method] = sdict
-
+        print('Selection Method: %s, Time: %f' % (selection_method, time.time() - t0))
 class EN(StandardLM_experiment):
 
     @classmethod

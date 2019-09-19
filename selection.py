@@ -7,6 +7,7 @@ from info_criteria import GIC, eBIC, gMDL, empirical_bayes
 from aBIC import aBIC, mBIC
 from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
 
 class Selector():
 
@@ -39,7 +40,7 @@ class Selector():
                                   reg_params)
         elif self.selection_method == 'oracle':
         
-            sdict = self.selector(solutions, reg_params, true_model)
+            sdict = self.oracle_selector(solutions, reg_params, true_model)
 
         elif self.selection_method == 'aBIC':
             sdict = self.aBIC_selector(X, y, solutions, 
@@ -77,7 +78,14 @@ class Selector():
             sidx = np.argmin(scores[:, 0])
             sdict['effective_penalty'] = scores[sidx, 1] 
         elif self.selection_method == 'empirical_bayes':
-            scores = np.array([empirical_bayes(X, y,
+            # Properly normalize before selection
+            X = StandardScaler().fit_transform(X)
+            y = StandardScaler().fit_transform(y.reshape(-1, 1)).ravel()            
+            # Require a linear regression fit on the full model to estimate 
+            # the noise variance:
+            bfull = LinearRegression().fit(X, y).coef_ 
+            ssq_hat = (y.T @ y - bfull.T @ X.T @ X @ bfull)/(X.shape[0] - X.shape[1])
+            scores = np.array([empirical_bayes(X, y, ssq_hat,
                                    solutions[i, :])
                    for i in range(solutions.shape[0])])
             sidx = np.argmin(scores[:, 0])
@@ -90,9 +98,9 @@ class Selector():
 
     def oracle_selector(self, solutions, reg_params, true_model):
         # Quickly return the best selection accuracy
-        selection_acuracies = selection_accuracy(true_model.ravel(), solutions)
+        selection_accuracies = selection_accuracy(true_model.ravel(), solutions)
         sidx = np.argmax(selection_accuracies)
-
+        sdict = {}
         sdict['coefs'] = solutions[sidx, :]
         sdict['reg_param'] = reg_params[sidx]
 
@@ -137,7 +145,7 @@ class UoISelector(Selector):
         elif self.selection_method in ['BIC', 'AIC', 'mBIC',
                                        'eBIC', 'gMDL', 'empirical_bayes']: 
             sdict = self.selector(X, y)
-        elif select.selection_method == 'oracle':
+        elif self.selection_method == 'oracle':
             sdict = self.oracle_selector(true_model)
 
         elif self.selection_method == 'aBIC':
@@ -151,6 +159,9 @@ class UoISelector(Selector):
             sy = self.uoi._y_scaler
             sdict['coefs'] /= sX.scale_
             sdict['coefs'] *= sy.scale_
+
+        # Don't bother to keep track of the effective penalty 
+        sdict['effective_penalty'] = np.nan
 
         return sdict
 
@@ -198,7 +209,7 @@ class UoISelector(Selector):
             n_samples, n_features = xx.shape
             y_pred = solutions[boot, ...] @ xx.T + intercepts[boot, :][:, np.newaxis]
 
-            sdict_ = super(UoISelector, self).selector(yy, y_pred, solutions[boot, ...], 
+            sdict_ = super(UoISelector, self).selector(xx, yy, y_pred, solutions[boot, ...], 
                                                            np.arange(n_supports)) 
 
             selected_coefs[boot, :] = sdict_['coefs']

@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from pyuoi.utils import log_likelihood_glm
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
@@ -67,37 +68,33 @@ def gMDL(y, y_pred, k):
 
 # Empirical bayesian procedure (Calibration and Empirical Bayes 
 # Variable Selection)
-def empirical_bayes(X, y, beta):
+def empirical_bayes(X, y, ssq_hat, beta):
 
     n, p = X.shape
     beta = beta.ravel()
     y = y.ravel()
     support = np.array(beta).astype(bool)
 
-    # Scale X, y properly before calculating quantities
-    X = StandardScaler().fit_transform(X)
-    y = StandardScaler().fit_transform(y)
-
     # Paper provides closed form expression
     # Using the conditional marginal likelihood criterion
     q = np.count_nonzero(beta)
-    support = (beta !=0).astype(bool)
-    ssg = beta.T @ X[:, support].T @ X[:, support] @ beta
-
-    # Noise variance estimate. Use the full model recommendation
-    bfull = LinearRegression().fit(X, y).coef_    
-    ssq_hat = (y.T @ y - bfull.T @ X.T @ X @ bfull)/(n - p)
     
-    R = -2 * (xlogy(p - q, p - q) + xlogy(q, q))
+    if q > 0:
+        support = (beta !=0).astype(bool)
+        ssg = beta[support].T @ X[:, support].T @ X[:, support] @ beta[support]
 
-    if np.divide(ssg, ssq_hat * q) > 1:
+        R = -2 * (xlogy(p - q, p - q) + xlogy(q, q))
 
-        B = q + q * np.log(ssg/ssq_hat) - xlogy(q, q)
+        if np.divide(ssg, ssq_hat * q) > 1:
 
-        return ssg/ssq_hat - B - R, B + R
+            B = q + q * np.log(ssg/ssq_hat) - xlogy(q, q)
 
+            return ssg/ssq_hat - B - R, B + R
+
+        else:
+            return -R, R
     else:
-        return -R, R
+        return 0, 0
 
 # Full Bayes factor
 def full_bayes_factor(y, y_pred, n_features, model_size, sparsity_prior, penalty):

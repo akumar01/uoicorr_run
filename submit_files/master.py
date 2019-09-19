@@ -11,7 +11,7 @@ script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
 exp_types =  ['UoILasso',  'EN', 'CV_Lasso', 'scad', 'mcp']
 
 # Estimated worst case run-time for a single repitition for each algorithm in exp_types 
-algorithm_times = ['08:00:00',  '02:00:00', '01:00:00', '01:00:00', '01:00:00']
+algorithm_times = ['08:00:00',  '02:00:00', '04:00:00', '04:00:00', '04:00:00']
 
 n_features = 500
 
@@ -63,7 +63,7 @@ comm_params = {
 'cov_type' : 'interpolation',
 'n_features' : n_features,
 # n/p ratio #
-'np_ratio': 5,
+'np_ratio': [2, 4, 8, 16],
 'est_score' : 'BIC',
 'reps' : 20,
 'stability_selection' : [1.0],
@@ -72,7 +72,7 @@ comm_params = {
 'betadict' : beta_dict,
 # Inverse Signal to noise ratio
 'kappa' : [5, 2, 1],
-'sub_iter_params': ['betadict', 'sparsity', 'kappa']
+'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio']
 }
 
 # Parameters for ElasticNet
@@ -85,14 +85,13 @@ comm_params['gamma'] = [3]
 ###############################################################
 
 # Which selection methods should we apply to the algorithms?
-comm_params['selection_methods'] = ['BIC', 'AIC', 'CV', 'mBIC', 'gMDL', 'empirical_bayes', 'oracle']
+comm_params['selection_methods'] = ['BIC', 'AIC', 'CV', 'gMDL', 'empirical_bayes', 'oracle']
 # Which fields should we record for each selection method? 
 comm_params['fields'] = {'BIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
 						 'AIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
 						 'CV' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
-                         'mBIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
-                         'gMDL' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'effective_penalty'],
+                         'gMDL' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
                          'empirical_bayes' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 
-                                              'effective_penalty'], 
+                                              ], 
                          'oracle' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param']}
 
