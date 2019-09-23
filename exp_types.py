@@ -169,7 +169,7 @@ class UoILasso():
                 stability_selection = args['stability_selection'],
                 n_lambdas = self.n_alphas,
                 comm = comm, 
-                solver = 'cd'
+                solver = 'pyc'
                 )
             if rank == 0:
                 print('Fitting!')
@@ -182,12 +182,12 @@ class UoILasso():
         # manually go in and select models and then take the union
         # using each distinct estimation score
 
-        if rank == 0:
-
-            true_model = args['betas'].ravel()
-            selector = UoISelector(self.fitted_estimator, selection_method = selection_method)
+        true_model = args['betas'].ravel()
+        selector = UoISelector(self.fitted_estimator, selection_method = selection_method, comm=comm)
             
-            sdict = selector.select(X, y, true_model)
+        sdict = selector.select(X, y, true_model)
+        
+        if rank == 0:
             self.results[selection_method] = sdict
 
         else:

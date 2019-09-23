@@ -11,7 +11,7 @@ script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
 exp_types =  ['UoILasso',  'EN', 'CV_Lasso', 'scad', 'mcp']
 
 # Estimated worst case run-time for a single repitition for each algorithm in exp_types 
-algorithm_times = ['08:00:00',  '02:00:00', '04:00:00', '04:00:00', '04:00:00']
+algorithm_times = ['12:00:00',  '04:00:00', '02:00:00', '02:00:00', '02:00:00']
 
 n_features = 500
 
@@ -63,10 +63,10 @@ comm_params = {
 'cov_type' : 'interpolation',
 'n_features' : n_features,
 # n/p ratio #
-'np_ratio': [2, 4, 8, 16],
+'np_ratio': [2, 4, 6, 8, 16],
 'est_score' : 'BIC',
 'reps' : 20,
-'stability_selection' : [1.0],
+'stability_selection' : [0.75],
 'n_boots_sel': 25,
 'n_boots_est' : 25,
 'betadict' : beta_dict,

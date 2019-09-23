@@ -172,12 +172,13 @@ def main(args):
 
     for i in range(num_tasks):
         start = time.time()
-
         params = f.read(chunk_param_list[chunk_idx][i])
-
         params['comm'] = subcomm
 
+        
         X, X_test, y, y_test, params = gen_data_(params, subcomm, subrank)
+        # if subrank == 0:
+            # print('Checkpoint 1: %f' % (time.time() - start))
 
         # Hard-coded convenience for SCAD/MCP
         if exp_type in ['scad', 'mcp']:
@@ -185,21 +186,27 @@ def main(args):
             params['penalty'] = exp_type
         else: 
             exp = locate('exp_types.%s' % exp_type)
-
+        t1 = time.time()
         exp_results = exp.run(X, y, params, selection_methods)
         if subrank == 0:
-            results_dict = init_results_container(selection_methods)
+            # print('checkpoint 2: %f' % (time.time() - start))
 
+            results_dict = init_results_container(selection_methods)
+            
             #### Calculate and log results for each selection method
+            
             for selection_method in selection_methods:
 
                 for field in fields[selection_method]:
                     results_dict[selection_method][field] = calc_result(X, X_test, y, y_test,
                                                                            params['betas'].ravel(), field,
                                                                            exp_results[selection_method])
-
+                    # print('result calculation time: %f' % (time.time() - t1))
+            #print('Checkpoint 3: %f' % (time.time() - start))
             # Add results to results manager. This automatically saves the child's data
+            t1 = time.time()
             rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
+            #print('Checkpoint 4: %f' % (time.time() - start))
             print('Process group %d completed outer loop %d/%d' % (rank, i, num_tasks))
             print(time.time() - start)
 
