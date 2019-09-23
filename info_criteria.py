@@ -68,7 +68,8 @@ def gMDL(y, y_pred, k):
 
 # Empirical bayesian procedure (Calibration and Empirical Bayes 
 # Variable Selection)
-def empirical_bayes(X, y, ssq_hat, beta):
+# Actual form of the penalty taken from Adaptive Bayesian variable selection criteria for GLM
+def empirical_bayes(X, y, y_pred, ssq_hat, beta):
 
     n, p = X.shape
     beta = beta.ravel()
@@ -79,22 +80,27 @@ def empirical_bayes(X, y, ssq_hat, beta):
     # Using the conditional marginal likelihood criterion
     q = np.count_nonzero(beta)
     
+    ll = log_likelihood_glm('normal', y, y_pred)
+
     if q > 0:
         support = (beta !=0).astype(bool)
-        ssg = beta[support].T @ X[:, support].T @ X[:, support] @ beta[support]
+        Tgamma = beta[support].T @ X[:, support].T @ X[:, support] @ beta[support]/ssq_hat
 
         R = -2 * (xlogy(p - q, p - q) + xlogy(q, q))
 
-        if np.divide(ssg, ssq_hat * q) > 1:
+        if np.divide(Tgamma, q) > 1:
 
-            B = q + q * np.log(ssg/ssq_hat) - xlogy(q, q)
+            B = q + q * np.log(Tgamma) - xlogy(q, q)
 
-            return ssg/ssq_hat - B - R, B + R
+            CCML = -2 * ll + B + R 
 
         else:
-            return -R, R
+            B = Tgamma
+            CCML = -2 * ll + Tgamma + R
+
+        return CCML, B, R
     else:
-        return 0, 0
+        return 0, 0, 0
 
 # Full Bayes factor
 def full_bayes_factor(y, y_pred, n_features, model_size, sparsity_prior, penalty):

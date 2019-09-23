@@ -80,8 +80,8 @@ class Selector():
             sdict['effective_penalty'] = scores[sidx, 1] 
         elif self.selection_method == 'empirical_bayes':
             # Properly normalize before selection
-            X = StandardScaler().fit_transform(X)
-            y = StandardScaler().fit_transform(y.reshape(-1, 1)).ravel()            
+            #X = StandardScaler().fit_transform(X)
+            # y = StandardScaler().fit_transform(y.reshape(-1, 1)).ravel()            
             # Require a linear regression fit on the full model to estimate 
             # the noise variance:
             bfull = LinearRegression().fit(X, y).coef_ 
