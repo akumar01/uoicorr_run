@@ -39,7 +39,7 @@ def gen_beta(n_features = 60, block_size = 6, sparsity = 0.6, betadist = 'unifor
 # A betawidth of inf is a uniform distribution on the range 0-10
 def gen_beta2(n_features = 60, block_size = 10, sparsity = 0.6,
             betawidth = np.inf, sparsity_profile = 'uniform',
-            n_active_blocks = None, seed = None):
+            n_active_blocks = None, seed = None, distribution='normal'):
     n_blocks = int(np.floor(n_features/block_size))
 
     n_nonzero_beta = int(sparsity * block_size)
@@ -56,8 +56,13 @@ def gen_beta2(n_features = 60, block_size = 10, sparsity = 0.6,
         beta = invexp_dist(-5, 5, n_features)
     else:
         beta = np.zeros((0,))    # empty for now
+
+        # Rejection sample to produce distributions with truncated support
         while beta.shape[0] < n_features:
-            b = np.random.laplace(scale = betawidth, loc = 5, size=(n_features,))
+            if distribution == 'normal':
+                b = np.random.normal(loc=5, scale=betawidth, size = (n_features,))
+            else:
+                b = np.random.laplace(scale = betawidth, loc = 5, size=(n_features,))
             accepted = b[(b >= 0) & (b <= 10)]
             beta = np.concatenate((beta, accepted), axis=0)
         beta = beta[:n_features]
