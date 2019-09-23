@@ -100,7 +100,8 @@ def empirical_bayes(X, y, y_pred, ssq_hat, beta):
 
         return CCML, B, R
     else:
-        return 0, 0, 0
+        # Do not give the opportunity to select support wiht 0 coefficients
+        return np.inf, 0, 0
 
 # Full Bayes factor
 def full_bayes_factor(y, y_pred, n_features, model_size, sparsity_prior, penalty):
