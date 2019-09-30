@@ -83,11 +83,12 @@ class Selector():
             # y = StandardScaler().fit_transform(y.reshape(-1, 1)).ravel()            
             # Require a linear regression fit on the full model to estimate 
             # the noise variance:
-            bfull = LinearRegression().fit(X, y).coef_ 
+            bfull = LinearRegression().fit(X, y).coef_.ravel() 
+            y = y.ravel()
             ssq_hat = (y.T @ y - bfull.T @ X.T @ X @ bfull)/(X.shape[0] - X.shape[1])
             scores = np.array([empirical_bayes(X, y, y_pred[i, :], ssq_hat,
                                    solutions[i, :])
-                   for i in range(solutions.shape[0])])
+                               for i in range(solutions.shape[0])])
             sidx = np.argmin(scores[:, 0])
             sdict['effective_penalty'] = scores[sidx, 1]
         # Selection dict: Return coefs and selected_reg_param

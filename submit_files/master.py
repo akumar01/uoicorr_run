@@ -55,8 +55,8 @@ betawidth = [0.1, np.inf, -1]
 
 beta_dict = []
 for i, bw in enumerate(betawidth):
-
-	beta_dict.append({'betawidth' : bw, 'beta': gen_beta2(n_features, n_features, 1, bw, seed = betaseed)})
+    # NOTE THE DISTRIBUTION
+	beta_dict.append({'betawidth' : bw, 'beta': gen_beta2(n_features, n_features, 1, bw, seed = betaseed, distribution='normal')})
 
 ##### Common parameters held fixed across all jobs ##########
 comm_params = {
