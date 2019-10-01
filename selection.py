@@ -21,15 +21,6 @@ class Selector():
         # Common operations to all
         n_samples, n_features = X.shape
 
-        # # Fit OLS models
-        # OLS_solutions = np.zeros(soltions.shape)
-
-        # for i in range(solutions.shape[0]):
-        #     support = solutions[i, :].astype(bool)
-        #     linmodel = LinearRegression(fit_intercept=False)
-        #     linmodel.fit(X[:, support], y)
-        #     OLS_solutions[i, support] = linmodel.coef_
-
         y_pred = solutions @ X.T + intercept
 
         # Deal to the appropriate sub-function based on 
@@ -72,25 +63,40 @@ class Selector():
                                     np.count_nonzero(solutions[i, :]))
                                     for i in range(solutions.shape[0])])
             sidx = np.argmin(scores)
-        elif self.selection_method == 'gMDL':
-            scores = np.array([gMDL(y.ravel(), y_pred[i, :],
-                        np.count_nonzero(solutions[i, :]))
-                        for i in range(solutions.shape[0])])
-            sidx = np.argmin(scores[:, 0])
-            sdict['effective_penalty'] = scores[sidx, 1] 
-        elif self.selection_method == 'empirical_bayes':
-            # Properly normalize before selection
-            # y = StandardScaler().fit_transform(y.reshape(-1, 1)).ravel()            
-            # Require a linear regression fit on the full model to estimate 
-            # the noise variance:
-            bfull = LinearRegression().fit(X, y).coef_.ravel() 
-            y = y.ravel()
-            ssq_hat = (y.T @ y - bfull.T @ X.T @ X @ bfull)/(X.shape[0] - X.shape[1])
-            scores = np.array([empirical_bayes(X, y, y_pred[i, :], ssq_hat,
-                                   solutions[i, :])
-                               for i in range(solutions.shape[0])])
-            sidx = np.argmin(scores[:, 0])
-            sdict['effective_penalty'] = scores[sidx, 1]
+
+        elif self.selection_method in ['gMDL', 'empirical_bayes']:
+
+            # Fit OLS models
+            OLS_solutions = np.zeros(soltions.shape)
+
+            for i in range(solutions.shape[0]):
+                support = solutions[i, :].astype(bool)
+                linmodel = LinearRegression(fit_intercept=False)
+                linmodel.fit(X[:, support], y)
+                OLS_solutions[i, support] = linmodel.coef_
+
+            y_pred = OLS_solutions @ X.T
+
+            if self.selection_method == 'gMDL':
+                scores = np.array([gMDL(y.ravel(), y_pred[i, :],
+                            np.count_nonzero(solutions[i, :]))
+                            for i in range(solutions.shape[0])])
+                sidx = np.argmin(scores[:, 0])
+                sdict['effective_penalty'] = scores[sidx, 1] 
+
+            elif self.selection_method == 'empirical_bayes':
+                # Properly normalize before selection
+                # y = StandardScaler().fit_transform(y.reshape(-1, 1)).ravel()            
+                # Require a linear regression fit on the full model to estimate 
+                # the noise variance:
+                bfull = LinearRegression().fit(X, y).coef_.ravel() 
+                y = y.ravel()
+                ssq_hat = (y.T @ y - bfull.T @ X.T @ X @ bfull)/(X.shape[0] - X.shape[1])
+                scores = np.array([empirical_bayes(X, y, y_pred[i, :], ssq_hat,
+                                       solutions[i, :])
+                                   for i in range(solutions.shape[0])])
+                sidx = np.argmin(scores[:, 0])
+                sdict['effective_penalty'] = scores[sidx, 1]
         # Selection dict: Return coefs and selected_reg_param
         sdict['coefs'] = solutions[sidx, :]
         sdict['reg_param'] = reg_params[sidx]
