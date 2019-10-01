@@ -252,7 +252,7 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
     
 # srun_opts: options to feed into the srun command (for example, n tasks, n cpus per task)
 def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
-                         skip_argfiles = False, single_test = False): 
+                         skip_argfiles = False, single_test = False, exp_types=None): 
                          
     if not os.path.exists(jobdir):
         os.makedirs(jobdir)
@@ -267,7 +267,8 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
 
     iter_params = args.iter_params
     comm_params = args.comm_params
-    exp_types = args.exp_types
+    if exp_types is None:
+        exp_types = args.exp_types
     algorithm_times = args.algorithm_times
     script_dir = args.script_dir
 
@@ -423,11 +424,11 @@ def run_(run_file):
                 
 # Sequentially run files locally:
 def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = None,
-                   script_dir=None, background = False):
+                   script_dir=None, exec_str = 'srun'):
     # Crawl through all subdirectories and 
     # (1) Grab the sbatch files
     # (2) Extract the srun statement
-    # (3) Replace srun with mpiexec 
+    # (3) Replace srun with exec_str -n nprocs 
     # (4) Replace script and data dirs with local machine paths
     # (5) Run 
 
@@ -446,7 +447,7 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
             srun_string = [s for s in fcontents if 'srun' in s][0]
 
             # replace srun with mpiexec -nprocs
-            mpi_string = srun_string.replace('srun', 'mpiexec -n %d' % nprocs)
+            mpi_string = srun_string.replace('srun', '%s -n %d' % (exec_str, nprocs))
             mpi_string = split(mpi_string)
 
             # Replace script and data dirs with local machine paths
@@ -462,13 +463,8 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
             mpi_string_suffix = '/'.join(mpi_string[7].split('/')[-2:])
             mpi_string[7] = run_file_root_path + '/%s' % mpi_string_suffix
 
-            # Spawn process in the background of shell, only do this if you 
-            # trust the program will work independently
-            if background:
-                subprocess.Popen(mpi_string, shell = True)
-            else:
-                for output in local_exec(mpi_string):
-                    print(output)
+            for output in local_exec(mpi_string):
+                print(output)
 
 # Copied from this stackoverflow post: https://stackoverflow.com/questions/4417546/constantly-print-subprocess-output-while-process-is-running
 # Capture stdout in real time 
