@@ -19,8 +19,8 @@ from misc import group_dictionaries, unique_obj
 
 from job_utils.idxpckl import Indexed_Pickle
 
-# Go through the iter param list and strip away any entries that do not 
-# pass validations. 
+# Go through the iter param list and strip away any entries that do not
+# pass validations.
 def validate_params(iter_param_list):
 
     bad_idxs = []
@@ -62,7 +62,7 @@ def chunk_list(l, n):
     for i in range(0, len(l), n):
         # Create an index range for l of n items:
         yield l[i:i+n]
-        
+
 # Convert all numpy datatypes to native python
 # datatypes
 def fix_datatypes(obj):
@@ -71,7 +71,7 @@ def fix_datatypes(obj):
     if type(obj) == list:
         for idx, sub_obj in enumerate(obj):
             obj[idx] = fix_datatypes(sub_obj)
-        
+
     # If ndarray, convert to list, and then
     # recursively search through it:
     if type(obj) == np.ndarray:
@@ -105,15 +105,15 @@ def generate_arg_files(argfile_array, jobdir):
         start = time.time()
 
         # Generate the full set of data/metadata required to run the job
-        
+
         sub_iter_params = arg_['sub_iter_params']
-        if sub_iter_params: 
+        if sub_iter_params:
             for key in sub_iter_params:
                 if not hasattr(arg_[key], '__len__'):
                     arg_[key] = [arg_[key]]
                 arg_[key] = list(arg_[key])
 
-        
+
         # Complement of the sub_iter_params:
         const_keys = list(set(arg_.keys()) - set(sub_iter_params))
 
@@ -155,15 +155,15 @@ def generate_arg_files(argfile_array, jobdir):
             seed = gen_seed(i, j, len(iter_param_list), len(argfile_array))
             param_comb['seed'] = seed
             seeds.append(seed)
-        
+
 
         ntasks.append(len(iter_param_list))
         arg_file = '%s/master/params%d.dat' % (jobdir, j)
         paths.append(arg_file)
 
         f = Indexed_Pickle(arg_file)
-        f.init_save(len(iter_param_list), header_data = 
-                    {'n_features' : param_comb['n_features'], 
+        f.init_save(len(iter_param_list), header_data =
+                    {'n_features' : param_comb['n_features'],
                      'selection_methods' : param_comb['selection_methods'],
                      'fields' : param_comb['fields']})
         for elem in iter_param_list:
@@ -173,7 +173,7 @@ def generate_arg_files(argfile_array, jobdir):
         print('arg_file iteration time: %f' % (time.time() - start))
 
     # Check that all random number seeds are unique
-    assert(len(np.unique(seeds)) == len(seeds))    
+    assert(len(np.unique(seeds)) == len(seeds))
 
     return paths, ntasks
 
@@ -184,22 +184,22 @@ def generate_log_file(argfile_array, jobdir, desc = None):
     metadata.desc = desc
     metadata.to_pickle('%s/log.dat' % jobdir)
 
-    
+
 def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
 
     # Generate sbatch scripts for the given directory
 
     # Quality of service: If running on shared queue, then do not
     # set up MPI parameters and request only a single core
-    
+
     for i, sbatch in enumerate(sbatch_array):
-        qos = sbatch['qos']    
-       
+        qos = sbatch['qos']
+
         if 'sbname' not in list(sbatch.keys()):
             sbname = 'sbatch%d.sh' % i
         else:
             sbname = sbatch['sbname']
-            
+
         sbname = '%s/%s' % (sbatch_dir, sbname)
 
         if 'jobname' not in list(sbatch.keys()):
@@ -218,9 +218,9 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
                 sb.write('#SBATCH -N 1\n')
             else:
                 sb.write('#SBATCH --qos=shared\n')
-            
+
             sb.write('#SBATCH -n %d\n' % sbatch['ntasks'])
-            sb.write('#SBATCH -c %d\n' % sbatch['cpt'])    
+            sb.write('#SBATCH -c %d\n' % sbatch['cpt'])
             sb.write('#SBATCH -t %s\n' % sbatch['job_time'])
 
             sb.write('#SBATCH --job-name=%s\n' % jobname)
@@ -233,27 +233,27 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
             # To make this work, we had to add some paths to our .bash_profile.ext
             sb.write('source ~/anaconda3/bin/activate\n')
             sb.write('source activate nse\n')
-            
+
             if qos == 'regular':
                 # Critical to prevent threads competing for resources
                 sb.write('export OMP_NUM_THREADS=1\n')
                 sb.write('export KMP_AFFINITY=disabled\n')
-            
+
             # Broadcast script to compute nodes
             # sb.write('sbcast -f --compress %s/%s /tmp/%s\n' % (script_dir, script, script))
 
             # sb.write('sbcast -f --compress %s/%s /tmp/%s\n' % (script_dir, script, script))
-            sb.write('srun python3 -u %s/%s %s %s %s' 
+            sb.write('srun python3 -u %s/%s %s %s %s'
                      % (script_dir, script, sbatch['arg_file'],
                      results_file, sbatch['exp_type']))
-                
-# Use skip_argfiles if arg_files have already been generated and just need to 
+
+# Use skip_argfiles if arg_files have already been generated and just need to
 # re-gen sbatch files
-    
+
 # srun_opts: options to feed into the srun command (for example, n tasks, n cpus per task)
 def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
-                         skip_argfiles = False, single_test = False, exp_types=None): 
-                         
+                         skip_argfiles = False, single_test = False, exp_types=None):
+
     if not os.path.exists(jobdir):
         os.makedirs(jobdir)
 
@@ -282,7 +282,7 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         argfile_array = []
 
         if iter_params:
-        
+
             iter_keys = list(iter_params.keys())
 
             # Iterate over all combinations of parameters in iter_params and combine them
@@ -290,7 +290,7 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
             for arg_comb in itertools.product(*list(iter_params.values())):
                 arg = {}
                 for j in range(len(arg_comb)):
-                    arg[iter_keys[j]] = arg_comb[j]         
+                    arg[iter_keys[j]] = arg_comb[j]
                 for key, value in comm_params.items():
                     arg[key] = value
 
@@ -298,7 +298,7 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
                 # Create only a single file for testing purposes
                 if single_test:
                     break
-        else: 
+        else:
             # No iter params (generate just a single arg file)
             argfile_array = [comm_params]
 
@@ -314,8 +314,8 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
     else:
         # Need to get paths and ntasks
         paths = glob('%s/master/*.dat' % jobdir)
-        
-    # Create an sbatch_array used to generate sbatch files that specifies exp_type, job_time, 
+
+    # Create an sbatch_array used to generate sbatch files that specifies exp_type, job_time,
     # num_tasks, and the path to the corresponding arg_file
 
     sbatch_array = []
@@ -335,12 +335,12 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
     # Generate the directory structure and sbatch files
 
     for i, exp_type in enumerate(exp_types):
-        
+
         if not os.path.exists('%s/%s' % (jobdir, exp_type)):
             os.mkdir('%s/%s' % (jobdir, exp_type))
 
         generate_sbatch_scripts(sbatch_array[i], '%s/%s' % (jobdir, exp_type),
-                                script_dir)        
+                                script_dir)
 
 # Jobdir: Directory to crawl through
 # size: only submit this many jobs (if exp_type specified, this
@@ -350,21 +350,21 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
 # edit before submitting
 # run: If set to false, make modifications to sbatch files but do not run them
 def run_jobs(jobdir, constraint, size = None, nums = None, run_files = None,
-             exp_type = None, run = False):
-    
-    # Crawl through all subdirectories and 
+             exp_type = None, resume=False,  run = False):
+
+    # Crawl through all subdirectories and
     # (1) change permissions of sbatch file
     # (2) run sbatch file
     if run_files is None:
         run_files = grab_files(jobdir, '*.sh', exp_type)
-    
+
     # Can either constrain size or manually give numbers
     if size is not None:
         run_files = run_files[:size]
     elif nums is not None:
         run_files = [r for r in run_files if int(r.split('params')[1].split('.dat')[0]) in nums]
     cont = input("You are about to submit %d jobs, do you want to continue? [0/1]" % len(run_files))
-    
+
     if cont:
         for run_file in run_files:
             # Need to open up the file and include the particular constraint
@@ -373,46 +373,54 @@ def run_jobs(jobdir, constraint, size = None, nums = None, run_files = None,
             f = open(run_file, 'r')
             contents = f.readlines()
             f.close()
-            
+
             constraint_string = [s for s in contents if '--constraint' in s]
 
             # First remove any existing constraint strings
             if len(constraint_string) > 0:
                 for c in constraint_string:
                     contents.remove(c)
-            
+
             # Add constraint after declaration of qos
             if constraint == 'haswell':
                 contents.insert(2, '#SBATCH --constraint=haswell\n')
-              
+
             if constraint == 'knl':
-                contents.insert(2, '#SBATCH --constraint=knl\n')                  
-            
+                contents.insert(2, '#SBATCH --constraint=knl\n')
+
             f = open(run_file, "w")
             contents = "".join(contents)
             f.write(contents)
             f.close()
-            
+
+            # Append a resume flag
+            if resume:
+                f = open(run_file, 'r')
+                contents = f.readlines()
+                f.close()
+
+                pbb.set_trace()
+
             if run:
                 run_(run_file)
-                
+
 # Find jobs that are lacking a .h5 file (jobs that failed to run)
 def unfinished_jobs(jobdir, exp_type = None):
-    
+
     # Get all potential files to run
     all_files = grab_files(jobdir, '*.sh', exp_type)
     # Get all files with a .h5 output
-    completed_files = grab_files(jobdir, '*.dat', exp_type)            
-                
-    # Get the job numbers to compare 
+    completed_files = grab_files(jobdir, '*.dat', exp_type)
+
+    # Get the job numbers to compare
     all_files = [os.path.split(f)[1] for f in all_files]
     all_jobnos = [int(f.split('.sh')[0].split('sbatch')[1]) for f in all_files]
-    
+
     completed_files = [os.path.split(f)[1] for f in completed_files]
     completed_jobnos = [int(f.split('.dat')[0].split('job')[1]) for f in completed_files]
-    
+
     to_run = np.setdiff1d(all_jobnos, completed_jobnos)
-    
+
     # Reconstruct the full paths from the numbers
     run_paths = paths_from_nums(jobdir, exp_type, to_run, 'sbatch')
     return run_paths
@@ -421,16 +429,16 @@ def unfinished_jobs(jobdir, exp_type = None):
 def run_(run_file):
     os.system('chmod u+x %s' % run_file)
     os.system('sbatch %s' % run_file)
-                
+
 # Sequentially run files locally:
 def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = None,
                    script_dir=None, exec_str = 'srun'):
-    # Crawl through all subdirectories and 
+    # Crawl through all subdirectories and
     # (1) Grab the sbatch files
     # (2) Extract the srun statement
-    # (3) Replace srun with exec_str -n nprocs 
+    # (3) Replace srun with exec_str -n nprocs
     # (4) Replace script and data dirs with local machine paths
-    # (5) Run 
+    # (5) Run
 
     if run_files is None:
         run_files = grab_files(jobdir, '*.sh', exp_type)
@@ -454,7 +462,7 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
             if script_dir is not None:
                 mpi_string[5] = script_dir
 
-            # Replace the data path with the local machine path, if they are 
+            # Replace the data path with the local machine path, if they are
             # not the same
             run_file_root_path = '/'.join(run_file.split('/')[:-2])
             mpi_string_suffix = '/'.join(mpi_string[6].split('/')[-2:])
@@ -467,11 +475,11 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
                 print(output)
 
 # Copied from this stackoverflow post: https://stackoverflow.com/questions/4417546/constantly-print-subprocess-output-while-process-is-running
-# Capture stdout in real time 
+# Capture stdout in real time
 def local_exec(cmd):
     popen = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
     for stdout_line in iter(popen.stdout.readline, ""):
-        yield stdout_line 
+        yield stdout_line
     popen.stdout.close()
     return_code = popen.wait()
     if return_code:
@@ -483,7 +491,7 @@ def local_exec(cmd):
 # edit attirubte must be dictionary key pairs
 # to None, and pass in linestring instead
 def set_job_attribute(run_files, edit_attribute, linestring = None, exp_type = None):
-    
+
     bad_idxs = np.zeros(len(run_files))
 
     for ridx, run_file in enumerate(run_files):
@@ -505,7 +513,7 @@ def set_job_attribute(run_files, edit_attribute, linestring = None, exp_type = N
                     contents.insert(key_string_idx, new_key_string)
                 except:
                     bad_idxs[ridx] = 1
- 
+
         elif linestring is not None:
             for key, value in linestring.items():
                 key_string = [s for s in contents if key in s][0]
@@ -521,30 +529,30 @@ def set_job_attribute(run_files, edit_attribute, linestring = None, exp_type = N
 
     return bad_idxs
 
-# Open up an sbatch file and grab an attributes like job time that cannot be read off from 
+# Open up an sbatch file and grab an attributes like job time that cannot be read off from
 # anywhere else
 def get_job_attribute(run_files, attribute, exp_type = None):
 
     attribute_vals = []
 
-    for run_file in run_files:  
+    for run_file in run_files:
         with open(run_file, 'r') as f:
             contents = f.readlines()
-        
+
         attribute_string = [s for s in contents if ' %s' % attribute in s][0]
         if '--' in attribute:
-            attribute_value = attribute_string.split('%s=' % attribute)[1].split('\n')[0]            
+            attribute_value = attribute_string.split('%s=' % attribute)[1].split('\n')[0]
         elif '-' in attribute:
             attribute_value = attribute_string.split('%s ' % attribute)[1].split('\n')[0]
         attribute_vals.append(attribute_value)
 
     return attribute_vals
- 
+
 # Remove line
 def remove_line(run_files, index):
-    
+
     for run_file in run_files:
-        
+
         f = open(run_file, 'r')
         contents = f.readlines()
         f.close()
@@ -554,7 +562,7 @@ def remove_line(run_files, index):
         contents = "".join(contents)
         f.write(contents)
         f.close()
-        
+
 # Change the arguments sent into the srun argument
 def edit_srun_statement(run_files, srun_args):
 
@@ -571,7 +579,7 @@ def edit_srun_statement(run_files, srun_args):
         new_srun = 'srun %s ' % srun_args
 
         srun_split[0] = new_srun
-        new_srun_string = "".join(srun_string)        
+        new_srun_string = "".join(srun_string)
         contents.insert(srun_string_idx, new_srun_string)
 
         f = open(run_file, 'w')
@@ -579,7 +587,7 @@ def edit_srun_statement(run_files, srun_args):
         f.write(contents)
         f.close()
 
-# Crawl through a subdirectory and grab all files contained in it matching the 
+# Crawl through a subdirectory and grab all files contained in it matching the
 # provided criteria:
 def grab_files(root_dir, file_str, exp_type = None):
     run_files = []
@@ -598,7 +606,7 @@ def grab_files(root_dir, file_str, exp_type = None):
 
 # Return the full path to the file type given a list of jobIDs
 def paths_from_nums(jobdir, exp_type, nums, type_):
-    
+
     base_path = '%s/%s' % (jobdir, exp_type)
     paths = []
     for n in nums:
@@ -637,13 +645,13 @@ def split_job(jobdir, exp_type, jobnums, n_splits):
 
         # Distribute parameters across multiple files
         task_splits = np.array_split(np.arange(total_tasks), n_splits)
-        
+
         split_param_files = ['%s_split%d.dat' % (param_file.split('.dat')[0], ii) for ii in range(n_splits)]
 
         for j, split_param_file in enumerate(split_param_files):
             with open(split_param_file, 'wb') as f2:
-                
-                f2.write(struct.pack('L', 0))     
+
+                f2.write(struct.pack('L', 0))
                 f2.write(pickle.dumps(len(task_splits[j])))
                 f2.write(pickle.dumps(n_features))
 
@@ -664,7 +672,7 @@ def split_job(jobdir, exp_type, jobnums, n_splits):
 
         # Create corresponding sbatch files
         split_sbatch_files = ['%s_split%d.sh' % (sbatch_files[i], ii) for ii in range(n_splits)]
-        
+
         job_time = get_job_attribute([sbatch_files[i]], '-t', exp_type = exp_type)[0]
         jobname = get_job_attribute([sbatch_files[i]], '--job-name', exp_type = exp_type)[0]
         script_dir = '/global/homes/a/akumar25/repos/uoicorr'
@@ -672,17 +680,17 @@ def split_job(jobdir, exp_type, jobnums, n_splits):
         for j, sbatch_file in enumerate(split_sbatch_files):
             s = {
             'arg_file' : split_param_files[j],
-            'ntasks' : 34,            
+            'ntasks' : 34,
             'exp_type' : exp_type,
             'job_time' : job_time,
-            'sbname' : 'sbatch%d_split%d.sh' % (jobnums[i], j), 
+            'sbname' : 'sbatch%d_split%d.sh' % (jobnums[i], j),
             'jobname' : '%s_split%d' % (jobname, j)
             }
             sbatch_array.append(s)
 
         generate_sbatch_scripts(sbatch_array, '%s/%s' % (jobdir, exp_type), script_dir)
-        
-# Back out a submit file from the log file. 
+
+# Back out a submit file from the log file.
 # logfile: path to log
 def submit_from_log(logfile, submit_file):
 
@@ -703,7 +711,7 @@ def submit_from_log(logfile, submit_file):
     excluded_keys = ['l1_ratios']
 
     if 'sub_iter_params' in list(unique_attributes.keys()):
-        
+
         excluded_keys.extend(unique_attributes['sub_iter_params'])
 
     for key, value in unique_attributes.items():
@@ -716,13 +724,13 @@ def submit_from_log(logfile, submit_file):
     # be the comm_params
 
     comm_params = unique_attributes.copy()
-    for key in list(iter_params.keys()): 
+    for key in list(iter_params.keys()):
         del comm_params[key]
 
     pdb.set_trace()
 
     # Write to file
-    with open('%s.py' % submit_file, 'w') as f:       
+    with open('%s.py' % submit_file, 'w') as f:
 
         # Some default lines which can be changed after the fact
         f.write('import numpy as np\n')
@@ -735,9 +743,9 @@ def submit_from_log(logfile, submit_file):
         f.write("exp_types = ['UoILasso']\n")
         f.write("algorithm_times = ['24:00:00']\n")
 
-        # repr produces the string corresponding to the variable stdout. Then, 
+        # repr produces the string corresponding to the variable stdout. Then,
         # use reg expr to insert a newline character prior to every new dictionary
-        # key for nice formatting   
+        # key for nice formatting
         iter_param_string = repr(iter_params)
 
         for k in list(iter_params.keys()):

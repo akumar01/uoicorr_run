@@ -64,7 +64,7 @@ def gen_data_(params, subcomm, subrank):
     if subrank == 0:
         # Generate covariance
         sigma = gen_covariance(params['n_features'],
-                               params['cov_params']['correlation'], 
+                               params['cov_params']['correlation'],
                                params['cov_params']['block_size'],
                                params['cov_params']['L'],
                                params['cov_params']['t'])
@@ -75,7 +75,7 @@ def gen_data_(params, subcomm, subrank):
                              params['sparsity'], seed=params['cov_params']['block_size'])
 
     else:
-        
+
         sigma = None
         beta = None
 
@@ -83,7 +83,7 @@ def gen_data_(params, subcomm, subrank):
     beta = Bcast_from_root(beta, subcomm)
 
     params['sigma'] = sigma
-    params['betas'] = beta      
+    params['betas'] = beta
 
     # If all betas end up zero for this sparsity level, output a warning and skip
     # this iteration (Make sure all ranks are instructed to continue!)
@@ -136,7 +136,7 @@ def main(args):
     exp_type = args.exp_type
     results_dir = args.results_dir
 
-    # MPI initialization 
+    # MPI initialization
     comm, rank, color, subcomm, subrank, numproc, comm_splits = manage_comm()
 
     # Load or initialize the Results Manager object
@@ -149,7 +149,7 @@ def main(args):
     if rank == 0:
         rmanager.makedir()
 
-    # Chunk up iter_param_list to distribute across iterations. 
+    # Chunk up iter_param_list to distribute across iterations.
 
     # Take the complement of inserted_idxs in the results manager
     task_list = np.array(list(set(np.arange(total_tasks)).difference(set(rmanager.inserted_idxs()))))
@@ -165,9 +165,9 @@ def main(args):
     # is held constant across all iterations
 
     # hard-code n_reg_params because why not
-    if exp_type in ['EN', 'scad', 'mcp']: 
+    if exp_type in ['EN', 'scad', 'mcp']:
         n_reg_params = 2
-    else: 
+    else:
         n_reg_params = 1
 
     for i in range(num_tasks):
@@ -175,7 +175,7 @@ def main(args):
         params = f.read(chunk_param_list[chunk_idx][i])
         params['comm'] = subcomm
 
-        
+
         X, X_test, y, y_test, params = gen_data_(params, subcomm, subrank)
         # if subrank == 0:
             # print('Checkpoint 1: %f' % (time.time() - start))
@@ -184,7 +184,7 @@ def main(args):
         if exp_type in ['scad', 'mcp']:
             exp = locate('exp_types.%s' % 'PYC')
             params['penalty'] = exp_type
-        else: 
+        else:
             exp = locate('exp_types.%s' % exp_type)
         t1 = time.time()
         exp_results = exp.run(X, y, params, selection_methods)
@@ -192,9 +192,9 @@ def main(args):
             # print('checkpoint 2: %f' % (time.time() - start))
 
             results_dict = init_results_container(selection_methods)
-            
+
             #### Calculate and log results for each selection method
-            
+
             for selection_method in selection_methods:
 
                 for field in fields[selection_method]:
@@ -223,12 +223,12 @@ def main(args):
     if rank == 0:
         # concatenate and clean up results
         rmanager.concatenate()
-        rmanager.cleanup()
+        # rmanager.cleanup()
 
     print('Total time: %f' % (time.time() - total_start))
     print('Job completed!')
 
-if __name__ == '__main__': 
+if __name__ == '__main__':
 
     total_start = time.time()
 
