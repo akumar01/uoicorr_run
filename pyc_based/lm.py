@@ -2,6 +2,7 @@ import pycasso
 import numpy as np
 from sklearn.linear_model import RidgeCV
 from sklearn.linear_model.coordinate_descent import _alpha_grid
+from scipy.optimize import minimize_scalar
 
 # Pycasso solver wrapper with minimal class structure to interface with UoI
 class PycassoLasso():
@@ -39,10 +40,17 @@ class PycassoElasticNet():
 
     def init_reg_params(self, X, y):
 
-        # Set lambda2 using a RidgeCV fit
+        # For posterity: We select lambda2 by appling the LOCCV formula and explitily 
+        # optimizing this expression rather than using Ridge's CV because of memory 
+        # considerations for large problems (Ridge CV tries to create a large array of 
+        # all samples and all choices of regularization parameters)
+
+        # However, before applying to Elastic Net, it is important that we divide this
+        # estimate by 1/(2 * n_samples) to appropriately re-balance the terms 
+
         if self.lambda2 is None:
-            rdge = RidgeCV(alphas = np.linspace(1e-5, 100, 500)).fit(X, y)
-            self.lambda2 = rdge.alpha_
+            l2 = minimize_scalar(lambda l2 : LOOCV(X, y, l2)).x
+            self.lambda2 = l2/(2 * y.size)
 
         self.dummy_path = False
 
@@ -108,3 +116,10 @@ def augment_data(X, y, l2):
     yy = np.vstack([y, np.zeros((n_features, 1))])
  
     return XX, yy
+
+# Copied from https://arxiv.org/pdf/1509.09169;Lecture
+def LOOCV(X, y, alpha):
+    n, p = X.shape    
+    H = X @ np.linalg.inv(X.T @ X + alpha * np.eye(p)) @ X.T
+    B = np.diag(np.power(1 - np.diag(H), -1))
+    return 1/n * np.linalg.norm(B @ (np.eye(n) - H) @ y)**2
