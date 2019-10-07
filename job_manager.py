@@ -399,7 +399,12 @@ def run_jobs(jobdir, constraint, size = None, nums = None, run_files = None,
                 contents = f.readlines()
                 f.close()
 
-                pbb.set_trace()
+                # Last line needs to be modified
+                contents[-1] += ' -r'
+                f = open(run_file, 'w')
+                contents = "".join(contents)
+                f.write(contents)
+                f.close()
 
             if run:
                 run_(run_file)
