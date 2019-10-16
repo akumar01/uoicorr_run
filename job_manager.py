@@ -342,6 +342,25 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         generate_sbatch_scripts(sbatch_array[i], '%s/%s' % (jobdir, exp_type),
                                 script_dir)
 
+def regen_sbatch_scripts(jobdir, script_dir, run_files, sbatch_dict):
+
+
+    exp_type = sbatch_dict['exp_type']
+
+    # Grab the param files associated with the run_files
+    jobnos = [int(f.split('.sh')[0].split('sbatch')[1]) for f in run_files]
+    # Get the paths to the param files
+    param_file_paths = ['%s/master/params%d.dat' % (jobdir, jobno) for jobno in jobnos]
+
+    sbatch_array = []
+    for j in range(len(param_file_paths)):
+
+        sbdct = deepcopy(sbatch_dict)
+        sbdct['arg_file'] = param_file_paths[j]
+        sbatch_array.append(sbdct)
+
+    generate_sbatch_scripts(sbatch_array, '%s/%s' % (jobdir, exp_type), script_dir)
+
 # Jobdir: Directory to crawl through
 # size: only submit this many jobs (if exp_type specified, this
 # means only submit this many jobs of this exp_type(s))
@@ -397,12 +416,12 @@ def run_jobs(jobdir, constraint, size = None, nums = None, run_files = None,
             if resume:
                 f = open(run_file, 'r')
                 contents = f.readlines()
-                
+
                 f.close()
                 # Last line needs to be modified
                 last_line = contents[-1]
                 srun_statement = last_line.split('\n')[0]
-                
+
                 if not srun_statement.endswith(' -r'):
                     srun_statement += ' -r'
                 contents[-1] = srun_statement + '\n'
