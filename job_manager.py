@@ -216,14 +216,13 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
             sb.write('#!/bin/bash\n')
             if qos == 'regular':
                 sb.write('#SBATCH --qos=regular\n')
-                sb.write('#SBATCH -N 1\n')
+                sb.write('#SBATCH -N 32\n')
             else:
                 sb.write('#SBATCH --qos=shared\n')
 
             sb.write('#SBATCH -n %d\n' % sbatch['ntasks'])
             sb.write('#SBATCH -c %d\n' % sbatch['cpt'])
             sb.write('#SBATCH -t %s\n' % sbatch['job_time'])
-
             sb.write('#SBATCH --job-name=%s\n' % jobname)
             sb.write('#SBATCH --out=%s/%s.o\n' % (sbatch_dir, jobname))
             sb.write('#SBATCH --error=%s/%s.e\n' % (sbatch_dir, jobname))
@@ -359,7 +358,7 @@ def regen_sbatch_scripts(jobdir, script_dir, run_files, sbatch_dict):
         sbdct = deepcopy(sbatch_dict)
         sbdct['arg_file'] = param_file_paths[j]
         sbatch_array.append(sbdct)
-
+    pdb.set_trace()
     generate_sbatch_scripts(sbatch_array, '%s/%s' % (jobdir, exp_type), script_dir)
 
 # Jobdir: Directory to crawl through
@@ -815,7 +814,7 @@ def count_unfinished_tasks(jobdir, exp_type):
         # Explore the corresponding folder
         child_path = '%s/%s/%s_job%d' % (jobdir, exp_type, exp_type, jobno)
 
-        rmanger = ResultsManager.restore_from_directory(child_path)
+        rmanager = ResultsManager.restore_from_directory(child_path)
 
         uft_count[jobno] = rmanager.total_tasks - len(rmanager.children)
 
