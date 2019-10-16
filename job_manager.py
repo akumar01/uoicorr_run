@@ -18,6 +18,7 @@ from utils import gen_covariance, gen_beta2, gen_data
 from misc import group_dictionaries, unique_obj
 
 from job_utils.idxpckl import Indexed_Pickle
+from job_utils.results import ResultsManager
 
 # Go through the iter param list and strip away any entries that do not
 # pass validations.
@@ -792,5 +793,30 @@ def submit_from_log(logfile, submit_file):
 
         f.write('comm_params = %s\n' % comm_param_string)
 
+# Given a jobdir and exp type, find all the .dat files
+# For jobs that have no completed .dat file, count the number of 
+# children compared to the total number of children required. Store
+# as an array 
+def count_unfinished_tasks(jobdir, exp_type):
 
+    # Get all potential files to run
+    all_files = grab_files(jobdir, '*.sh', exp_type)
 
+    jobnos = [int(f.split('.sh')[0].split('sbatch')[1]) for f in all_files]
+
+    ufj = unfinished_jobs(jobdir, exp_type)
+
+    uf_jobnos = [int(f.split('.sh')[0].split('sbatch')[1]) for f in ufj]
+
+    # Create a dictionary accounting of key value pairs
+    uft_count = dict(zip(jobnos, np.zeros(len(jobnos)))) 
+    for jobno in uf_jobnos:
+
+        # Explore the corresponding folder
+        child_path = '%s/%s/%s_job%d' % (jobdir, exp_type, exp_type, jobno)
+
+        rmanger = ResultsManager.restore_from_directory(child_path)
+
+        uft_count[jobno] = rmanager.total_tasks - len(rmanager.children)
+
+    return uft_count
