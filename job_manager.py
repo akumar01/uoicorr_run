@@ -397,10 +397,16 @@ def run_jobs(jobdir, constraint, size = None, nums = None, run_files = None,
             if resume:
                 f = open(run_file, 'r')
                 contents = f.readlines()
+                
                 f.close()
-
                 # Last line needs to be modified
-                contents[-1] += ' -r'
+                last_line = contents[-1]
+                srun_statement = last_line.split('\n')[0]
+                
+                if not srun_statement.endswith(' -r'):
+                    srun_statement += ' -r'
+                contents[-1] = srun_statement + '\n'
+
                 f = open(run_file, 'w')
                 contents = "".join(contents)
                 f.write(contents)
@@ -517,6 +523,7 @@ def set_job_attribute(run_files, edit_attribute, linestring = None, exp_type = N
                     contents.remove(key_string)
                     contents.insert(key_string_idx, new_key_string)
                 except:
+                    pdb.set_trace()
                     bad_idxs[ridx] = 1
 
         elif linestring is not None:
