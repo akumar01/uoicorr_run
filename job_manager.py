@@ -264,7 +264,7 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
 
     # Copy submit file to jobdir
     os.system('cp %s %s/' % (submit_file, jobdir))
-
+    pdb.set_trace()
     iter_params = args.iter_params
     comm_params = args.comm_params
     if exp_types is None:
@@ -809,42 +809,56 @@ def assemble_unfinished_tasks(jobdir, exp_type, params_to_ignore):
 
     # Create a dictionary accounting of key value pairs
     uf_task_list = {}
+    sbatch_param_mapping = {}
     for jobno in jobnos:
-
+        t0 = time.time()
         uf_task_list[jobno] = []
-
         if jobno in uf_jobnos:
 
-        # Explore the corresponding folder
-        child_path = '%s/%s/%s_job%d' % (jobdir, exp_type, exp_type, jobno)
-        rmanager = ResultsManager.restore_from_directory(child_path)
+            # Explore the corresponding folder
+            child_path = '%s/%s/%s_job%d' % (jobdir, exp_type, exp_type, jobno)
+            rmanager = ResultsManager.restore_from_directory(child_path)
 
-        param_file = '%s/master/params%d.dat' % (jobdir, jobno)
+            # The param file needs to be read from the srun statement, as the numbers
+            # do not line up
 
-        f = Indexed_Pickle(param_file)
-        f.init_read()
+            # with open('%s/%s/sbatch%d.sh' % (jobdir, exp_type, jobno), 'r') as f:
+            #    sbatch_contents = f.readlines()
 
-        # Take the complement of the list of rmanager children
-        unfinished_children_idxs = np.setdiff1d(np.arange(rmanager.total_tasks), 
+            #srun_statement = [s for s in sbatch_contents if 'srun' in s][0]
+            #param_file = srun_statement.split(' ')[4]
+            
+            #sbatch_param_mapping[jobno] = param_file
+
+            param_file = '%s/master/params%d.dat' % (jobdir, jobno)
+
+            f = Indexed_Pickle(param_file)
+            f.init_read()
+
+            # Take the complement of the list of rmanager children
+            unfinished_children_idxs = np.setdiff1d(np.arange(rmanager.total_tasks), 
                                          rmanager.inserted_idxs())
 
-        for ufci in unfinished_children_idxs:
+            for ufci in unfinished_children_idxs:
 
-            params = f.read(ufci) 
+                try:
+                    params = f.read(ufci) 
+                except:
+                    pdb.set_trace()
+                # If the params match the params we want to discard, continue, otherwise 
+                # add this index to the unfin_task_list
 
-            # If the params match the params we want to discard, continue, otherwise 
-            # add this index to the unfin_task_list
+                if np.any([params[key] in value for key, value in params_to_ignore.items()]):
+                    continue
+                else:
+                    uf_task_list[jobno].append(ufci)
 
-
-            if np.any([params[key] == val for key, value in params_to_ignore.items()]):
-                continue
-            else:
-                uf_task_list[jobno].append(ufci)
-
+            f.close_read()
+            print('%f s' % (time.time() - t0))
     return uf_task_list
 
 def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list):
-
+    pass
     # 
 
 
