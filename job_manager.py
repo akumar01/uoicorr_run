@@ -913,6 +913,7 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
             subidx += 1
             sublists.append({})
             counter = 0
+
         sublists[subidx][key] = value
         counter += len(value)
     
@@ -921,5 +922,70 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
 
     if not os.path.exists('%s/UoILasso' % new_jobdir):
         os.makedirs('%s/UoILasso' % new_jobdir)
-    
-    
+
+    # Need to make 5 sbatch files:
+    for i, tasklist in enumerate(sublists):
+
+        with open()
+        pickle.dump()
+
+        sbname = '%s/UoILasso/sbatch%d.sh' % (new_jobdir, i) 
+        sbatch_dir = '%s/UoILasso/dir%d' % (new_jobdir, i)
+
+        if not os.path.exists(sbatch_dir):
+            os.makedirs(sbatch_dir)
+
+        jobname = 'UoILasso_job%d' % i
+        script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
+        script = 'mpi_submit_emergency.py'
+
+        n_nodes = len(tasklist) * 3
+        with open(sbname, 'w') as sb:
+            # Arguments common across jobs
+            sb.write('#!/bin/bash\n')
+            sb.write('#SBATCH --qos=premium\n')
+            sb.write('#SBATCH --constraint=knl\n')            
+            sb.write('#SBATCH -N %d\n' % n_nodes)
+            sb.write('#SBATCH -t 01:30:00\n')
+            sb.write('#SBATCH --job-name=%s\n' % jobname)
+            sb.write('#SBATCH --out=%s/%s.o\n' % (sbatch_dir, jobname))
+            sb.write('#SBATCH --error=%s/%s.e\n' % (sbatch_dir, jobname))
+            sb.write('#SBATCH --mail-user=ankit_kumar@berkeley.edu\n')
+            sb.write('#SBATCH --mail-type=FAIL\n')
+            # Work with out own Anaconda environment
+            # To make this work, we had to add some paths to our .bash_profile.ext
+            sb.write('source ~/anaconda3/bin/activate\n')
+            sb.write('source activate nse\n')
+
+            # Critical to prevent threads competing for resources
+            sb.write('export OMP_NUM_THREADS=1\n')
+            sb.write('export KMP_AFFINITY=disabled\n')
+
+            # Write a separate srun statement for each Node
+            node = 0
+            for key, value in tasklist.items():
+                split_vals = np.array_split(value, 3)
+                for j in range(3):
+                    results_dir = '%s/node%d' % (sbatch_dir, node)
+                    if not os.path.exists(results_dir):
+                        os.makedirs(results_dir)
+
+                    # Save the param file name and indices that this particular node should process
+                    node_param_file = '%s/node_param_file.pkl' % results_dir
+                    with open(node_param_file, 'wb') as npf:
+                        pickle.dump(npf, {key : split_vals[j]})                    
+
+                    sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s UoILasso &\n' % (script_dir, script, node_param_file, results_dir))
+                    node += 1
+
+            sb.write('done')
+
+
+
+            # sb.write('sbcast -f --compress %s/%s /tmp/%s\n' % (script_dir, script, script))
+            sb.write('srun python3 -u %s/%s %s %s %s'
+                     % (script_dir, script, sbatch['arg_file'],
+                     results_file, sbatch['exp_type']))
+
+
+
