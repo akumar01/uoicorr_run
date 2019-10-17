@@ -837,14 +837,12 @@ def assemble_unfinished_tasks(jobdir, exp_type, params_to_ignore):
 
             # Take the complement of the list of rmanager children
             unfinished_children_idxs = np.setdiff1d(np.arange(rmanager.total_tasks), 
-                                         rmanager.inserted_idxs())
+                                         rmanager.inserted_idxs_oct())
 
             for ufci in unfinished_children_idxs:
 
-                try:
-                    params = f.read(ufci) 
-                except:
-                    pdb.set_trace()
+                params = f.read(ufci) 
+
                 # If the params match the params we want to discard, continue, otherwise 
                 # add this index to the unfin_task_list
 
