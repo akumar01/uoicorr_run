@@ -855,6 +855,39 @@ def assemble_unfinished_tasks(jobdir, exp_type, params_to_ignore):
             print('%f s' % (time.time() - t0))
     return uf_task_list
 
+
+def assemble_necessary_tasks(jobdir):
+
+    # Grab all the param files
+    param_files = natsort.natsorted(grab_files('%s/master' % jobdir, '*.dat'))
+
+    params_to_ignore = {'kappa' : [1, 2], 'np_ratio' : [2, 6, 8]}
+
+    tasks_per_file = {}
+
+    for param_file in param_files:
+        t0 = time.time()
+        tasks_per_file[param_file] = []
+
+        f = Indexed_Pickle(param_file)
+        f.init_read()
+
+        for idx in np.arange(len(f.index)):
+
+            params = f.read(idx)
+
+            if np.any([params[key] in value for key, value in params_to_ignore.items()]):
+                continue
+            else:
+                tasks_per_file[param_file].append(idx)
+
+        f.close_read()
+        print(time.time() - t0)
+
+    return tasks_per_file
+
+
+
 def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list):
     pass
     # 
