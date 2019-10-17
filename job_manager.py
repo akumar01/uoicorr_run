@@ -897,10 +897,20 @@ def assemble_necessary_tasks(jobdir):
 
 
 
-def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
+def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list, runtime, n_nodes, tasks_per_node):
 
     # Divide the uf_task_list into equal 5 equal parts
+
+    # Total unfinished tasks
+    total_tasks = np.sum([len(value) for value in uf_task_list.vales()])
     
+    nodes_required = int(np.ceil(total_tasks/tasks_per_node))
+    n_jobs = int(np.ceil(nodes_required/n_nodes))
+
+    taks_per_job = int(np.ceil(total_tasks/n_job))
+
+    # Divide the uf_task_list into the task lists for each job
+
     sublists = []
     sublists.append({})
     counter = 0
@@ -908,8 +918,7 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
     for key, value in uf_task_list.items():
         if len(value) == 0:
             continue
-
-        if counter > 26928:
+        if counter > task_per_job:
             subidx += 1
             sublists.append({})
             counter = 0
@@ -920,23 +929,22 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
     if not os.path.exists(new_jobdir):
         os.makedirs(new_jobdir)
 
-    if not os.path.exists('%s/UoILasso' % new_jobdir):
-        os.makedirs('%s/UoILasso' % new_jobdir)
+    if not os.path.exists('%s/%s' % (new_jobdir, exp_type)):
+        os.makedirs('%s/%s' % (new_jobdir, exp_type))
 
     # Need to make 5 sbatch files:
     for i, tasklist in enumerate(sublists):
 
-        sbname = '%s/UoILasso/sbatch%d.sh' % (new_jobdir, i) 
-        sbatch_dir = '%s/UoILasso/dir%d' % (new_jobdir, i)
+        sbname = '%s/%s/sbatch%d.sh' % (new_jobdir, exp_type, i) 
+        sbatch_dir = '%s/%s/dir%d' % (new_jobdir, exp_type, i)
 
         if not os.path.exists(sbatch_dir):
             os.makedirs(sbatch_dir)
 
-        jobname = 'UoILasso_job%d' % i
+        jobname = '%s_job%d' % (exp_type, i)
         script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
         script = 'mpi_submit_emergency.py'
 
-        n_nodes = len(tasklist) * 3
         with open(sbname, 'w') as sb:
             # Arguments common across jobs
             sb.write('#!/bin/bash\n')
@@ -960,20 +968,19 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
 
             # Write a separate srun statement for each Node
             node = 0
+
             for key, value in tasklist.items():
-                split_vals = np.array_split(value, 3)
-                for j in range(3):
-                    results_dir = '%s/node%d' % (sbatch_dir, node)
-                    if not os.path.exists(results_dir):
-                        os.makedirs(results_dir)
+                results_dir = '%s/node%d' % (sbatch_dir, node)
+                if not os.path.exists(results_dir):
+                    os.makedirs(results_dir)
 
-                    # Save the param file name and indices that this particular node should process
-                    node_param_file = '%s/node_param_file.pkl' % results_dir
-                    with open(node_param_file, 'wb') as npf:
-                        npf.write(pickle.dumps({key : split_vals[j]}))                 
+                # Save the param file name and indices that this particular node should process
+                node_param_file = '%s/node_param_file.pkl' % results_dir
+                with open(node_param_file, 'wb') as npf:
+                    npf.write(pickle.dumps({key : split_vals[j]}))                 
 
-                    sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s UoILasso &\n' % (script_dir, script, node_param_file, results_dir))
-                    node += 1
+                sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s %s &\n' % (script_dir, script, node_param_file, results_dir, exp_type))
+                node += 1
 
             sb.write('wait')
 
