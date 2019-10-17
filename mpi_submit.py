@@ -128,7 +128,8 @@ def main(args):
     f = Indexed_Pickle(args.arg_file)
     f.init_read()
     total_tasks = len(f.index)
-
+    pdb.set_trace()
+        
     n_features = f.header['n_features']
     selection_methods = f.header['selection_methods']
     fields = f.header['fields']
