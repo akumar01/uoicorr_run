@@ -902,16 +902,24 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
     # Divide the uf_task_list into equal 5 equal parts
     
     sublists = []
-    sublist.append({})
+    sublists.append({})
     counter = 0
     subidx = 0
     for key, value in uf_task_list.items():
+        if len(value) == 0:
+            continue
 
         if counter > 26928:
             subidx += 1
             sublists.append({})
-
-        sublist[subidx][key] = value
+            counter = 0
+        sublists[subidx][key] = value
         counter += len(value)
+    
+    if not os.path.exists(new_jobdir):
+        os.makedirs(new_jobdir)
 
-    pdb.set_trace()
+    if not os.path.exists('%s/UoILasso' % new_jobdir):
+        os.makedirs('%s/UoILasso' % new_jobdir)
+    
+    
