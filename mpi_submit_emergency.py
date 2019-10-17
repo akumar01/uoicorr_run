@@ -158,7 +158,7 @@ def main(args):
 
     # Take the complement of inserted_idxs in the results manager
     task_list = np.setdiff1d(indexlist, rmanager.inserted_idxs())
-    chunk_param_list = np.array_split(tasklist, comm_splits)
+    chunk_param_list = np.array_split(task_list, comm_splits)
     chunk_idx = color
     num_tasks = len(chunk_param_list[chunk_idx])
 
@@ -211,7 +211,7 @@ def main(args):
             t1 = time.time()
             rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
             #print('Checkpoint 4: %f' % (time.time() - start))
-            print('Process group %d completed outer loop %d/%d' % (subrank, i, num_tasks))
+            print('Process group %d completed outer loop %d/%d' % (color, i, num_tasks))
             print(time.time() - start)
 
         del params
@@ -222,11 +222,12 @@ def main(args):
     f.close_read()
 
     # gather results managers
-    rmanager.gather_managers(comm)
+    # rmanager.gather_managers(comm)
 
     if rank == 0:
+        pass
         # concatenate and clean up results
-        rmanager.concatenate()
+        # rmanager.concatenate()
         # rmanager.cleanup()
 
     print('Total time: %f' % (time.time() - total_start))

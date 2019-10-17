@@ -916,7 +916,7 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
 
         sublists[subidx][key] = value
         counter += len(value)
-    
+ 
     if not os.path.exists(new_jobdir):
         os.makedirs(new_jobdir)
 
@@ -925,9 +925,6 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
 
     # Need to make 5 sbatch files:
     for i, tasklist in enumerate(sublists):
-
-        with open()
-        pickle.dump()
 
         sbname = '%s/UoILasso/sbatch%d.sh' % (new_jobdir, i) 
         sbatch_dir = '%s/UoILasso/dir%d' % (new_jobdir, i)
@@ -973,19 +970,12 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
                     # Save the param file name and indices that this particular node should process
                     node_param_file = '%s/node_param_file.pkl' % results_dir
                     with open(node_param_file, 'wb') as npf:
-                        pickle.dump(npf, {key : split_vals[j]})                    
+                        npf.write(pickle.dumps({key : split_vals[j]}))                 
 
                     sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s UoILasso &\n' % (script_dir, script, node_param_file, results_dir))
                     node += 1
 
-            sb.write('done')
-
-
-
-            # sb.write('sbcast -f --compress %s/%s /tmp/%s\n' % (script_dir, script, script))
-            sb.write('srun python3 -u %s/%s %s %s %s'
-                     % (script_dir, script, sbatch['arg_file'],
-                     results_file, sbatch['exp_type']))
+            sb.write('wait')
 
 
 
