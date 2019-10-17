@@ -1054,3 +1054,18 @@ def gen_debug(original_jobdir, new_jobdir, uf_task_list):
                 sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s UoILasso &\n' % (script_dir, script, node_param_file, results_dir))
     
             sb.write('wait')
+
+
+def count_completed_tasks(path):
+
+    # Walk down the different subdirectories and 
+    # restore results managers and count if we have anything missing
+    ufj = {}
+
+    for root, dirs, files in os.walk(root_dir):
+        for d in dirs:
+            p = os.path.join(root, d)
+            if 'node' in p:
+                rmanager = ResultsManager.restore_from_directory(p)
+                ufj[p] = rmanager.total_tasks - len(rmanager.inserted_idxs())
+    return ufj
