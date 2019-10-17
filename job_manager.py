@@ -796,7 +796,7 @@ def submit_from_log(logfile, submit_file):
 # For jobs that have no completed .dat file, count the number of 
 # children compared to the total number of children required. Store
 # as an array 
-def count_unfinished_tasks(jobdir, exp_type):
+def assemble_unfinished_tasks(jobdir, exp_type, params_to_ignore):
 
     # Get all potential files to run
     all_files = grab_files(jobdir, '*.sh', exp_type)
@@ -808,14 +808,43 @@ def count_unfinished_tasks(jobdir, exp_type):
     uf_jobnos = [int(f.split('.sh')[0].split('sbatch')[1]) for f in ufj]
 
     # Create a dictionary accounting of key value pairs
-    uft_count = dict(zip(jobnos, np.zeros(len(jobnos)))) 
-    for jobno in uf_jobnos:
+    uf_task_list = {}
+    for jobno in jobnos:
+
+        uf_task_list[jobno] = []
+
+        if jobno in uf_jobnos:
 
         # Explore the corresponding folder
         child_path = '%s/%s/%s_job%d' % (jobdir, exp_type, exp_type, jobno)
-
         rmanager = ResultsManager.restore_from_directory(child_path)
 
-        uft_count[jobno] = rmanager.total_tasks - len(rmanager.children)
+        param_file = '%s/master/params%d.dat' % (jobdir, jobno)
 
-    return uft_count
+        f = Indexed_Pickle(param_file)
+        f.init_read()
+
+        # Take the complement of the list of rmanager children
+        unfinished_children_idxs = np.setdiff1d(np.arange(rmanager.total_tasks), 
+                                         rmanager.inserted_idxs())
+
+        for ufci in unfinished_children_idxs:
+
+            params = f.read(ufci) 
+
+            # If the params match the params we want to discard, continue, otherwise 
+            # add this index to the unfin_task_list
+
+
+            if np.any([params[key] == val for key, value in params_to_ignore.items()]):
+                continue
+            else:
+                uf_task_list[jobno].append(ufci)
+
+    return uf_task_list
+
+def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list):
+
+    # 
+
+
