@@ -22,7 +22,7 @@ from misc import group_dictionaries, unique_obj
 
 
 from job_utils.idxpckl import Indexed_Pickle
-# from job_utils.results import ResultsManager
+from job_utils.results import ResultsManager
 
 # Go through the iter param list and strip away any entries that do not
 # pass validations.
@@ -1056,16 +1056,23 @@ def gen_debug(original_jobdir, new_jobdir, uf_task_list):
             sb.write('wait')
 
 
-def count_completed_tasks(path):
+def count_completed_tasks(root_dir):
 
     # Walk down the different subdirectories and 
     # restore results managers and count if we have anything missing
     ufj = {}
-
+    ufc = {}
     for root, dirs, files in os.walk(root_dir):
         for d in dirs:
             p = os.path.join(root, d)
             if 'node' in p:
                 rmanager = ResultsManager.restore_from_directory(p)
-                ufj[p] = rmanager.total_tasks - len(rmanager.inserted_idxs())
-    return ufj
+                with open('%s/node_param_file.pkl' % p, 'rb') as f:
+                    params = pickle.load(f)
+                unfinished = list(np.setdiff1d(list(params.values())[0], rmanager.inserted_idxs()))
+                if list(params.keys())[0] in ufj.keys():
+                    ufj[list(params.keys())[0]].extend(unfinished)
+                else:
+                    ufj[list(params.keys())[0]] = unfinished
+                ufc[p] = rmanager.total_tasks - len(rmanager.inserted_idxs())
+    return ufj, ufc
