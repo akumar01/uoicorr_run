@@ -14,11 +14,15 @@ import pandas as pd
 from glob import glob
 from subprocess import check_output
 import subprocess
+import datetime
+import natsort
+
 from utils import gen_covariance, gen_beta2, gen_data
 from misc import group_dictionaries, unique_obj
 
+
 from job_utils.idxpckl import Indexed_Pickle
-from job_utils.results import ResultsManager
+# from job_utils.results import ResultsManager
 
 # Go through the iter param list and strip away any entries that do not
 # pass validations.
@@ -435,12 +439,15 @@ def run_jobs(jobdir, constraint, size = None, nums = None, run_files = None,
                 run_(run_file)
 
 # Find jobs that are lacking a .h5 file (jobs that failed to run)
-def unfinished_jobs(jobdir, exp_type = None):
+def unfinished_jobs(jobdir, exp_type = None, epoch=None):
 
     # Get all potential files to run
     all_files = grab_files(jobdir, '*.sh', exp_type)
     # Get all files with a .h5 output
     completed_files = grab_files(jobdir, '*.dat', exp_type)
+
+    if epoch is not None:
+        completed_files = [f for f in completed_files if os.path.getmtime(f) < epoch]
 
     # Get the job numbers to compare
     all_files = [os.path.split(f)[1] for f in all_files]
@@ -803,7 +810,7 @@ def assemble_unfinished_tasks(jobdir, exp_type, params_to_ignore):
 
     jobnos = [int(f.split('.sh')[0].split('sbatch')[1]) for f in all_files]
 
-    ufj = unfinished_jobs(jobdir, exp_type)
+    ufj = unfinished_jobs(jobdir, exp_type, datetime.datetime(2019, 10, 6).timestamp())
 
     uf_jobnos = [int(f.split('.sh')[0].split('sbatch')[1]) for f in ufj]
 
@@ -841,8 +848,10 @@ def assemble_unfinished_tasks(jobdir, exp_type, params_to_ignore):
 
             for ufci in unfinished_children_idxs:
 
-                params = f.read(ufci) 
-
+                try:
+                    params = f.read(ufci) 
+                except:
+                    pdb.set_trace()
                 # If the params match the params we want to discard, continue, otherwise 
                 # add this index to the unfin_task_list
 
@@ -859,7 +868,7 @@ def assemble_unfinished_tasks(jobdir, exp_type, params_to_ignore):
 def assemble_necessary_tasks(jobdir):
 
     # Grab all the param files
-    param_files = natsort.natsorted(grab_files('%s/master' % jobdir, '*.dat'))
+    param_files = natsort.natsorted(glob('%s/master/*.dat' % jobdir))
 
     params_to_ignore = {'kappa' : [1, 2], 'np_ratio' : [2, 6, 8]}
 
