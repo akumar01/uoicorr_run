@@ -977,5 +977,80 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
 
             sb.write('wait')
 
+def gen_debug(original_jobdir, new_jobdir, uf_task_list):
 
+    # Divide the uf_task_list into equal 5 equal parts
+    
+    sublists = []
+    sublists.append({})
+    counter = 0
+    subidx = 0
+    for key, value in uf_task_list.items():
+        if len(value) == 0:
+            continue
 
+        if counter > 26928:
+            subidx += 1
+            sublists.append({})
+            counter = 0
+
+        sublists[subidx][key] = value
+        counter += len(value)
+ 
+    if not os.path.exists(new_jobdir):
+        os.makedirs(new_jobdir)
+
+    if not os.path.exists('%s/UoILasso' % new_jobdir):
+        os.makedirs('%s/UoILasso' % new_jobdir)
+
+    # Need to make 5 sbatch files:
+    for i, tasklist in enumerate(sublists):
+
+        sbname = '%s/UoILasso/sbatch%d.sh' % (new_jobdir, i) 
+        sbatch_dir = '%s/UoILasso/dir%d' % (new_jobdir, i)
+
+        if not os.path.exists(sbatch_dir):
+            os.makedirs(sbatch_dir)
+
+        jobname = 'UoILasso_job%d' % i
+        script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
+        script = 'mpi_submit_emergency.py'
+
+        n_nodes = 4
+        with open(sbname, 'w') as sb:
+            # Arguments common across jobs
+            sb.write('#!/bin/bash\n')
+            sb.write('#SBATCH --qos=debug\n')
+            sb.write('#SBATCH --constraint=knl\n')            
+            sb.write('#SBATCH -N %d\n' % n_nodes)
+            sb.write('#SBATCH -t 00:30:00\n')
+            sb.write('#SBATCH --job-name=%s\n' % jobname)
+            sb.write('#SBATCH --out=%s/%s.o\n' % (sbatch_dir, jobname))
+            sb.write('#SBATCH --error=%s/%s.e\n' % (sbatch_dir, jobname))
+            sb.write('#SBATCH --mail-user=ankit_kumar@berkeley.edu\n')
+            sb.write('#SBATCH --mail-type=FAIL\n')
+            # Work with out own Anaconda environment
+            # To make this work, we had to add some paths to our .bash_profile.ext
+            sb.write('source ~/anaconda3/bin/activate\n')
+            sb.write('source activate nse\n')
+
+            # Critical to prevent threads competing for resources
+            sb.write('export OMP_NUM_THREADS=1\n')
+            sb.write('export KMP_AFFINITY=disabled\n')
+
+            # Write a separate srun statement for each Node
+            key = list(tasklist.keys())[0]
+            values = list(tasklist.values())[0]
+            for node in range(n_nodes):
+                results_dir = '%s/node%d' % (sbatch_dir, node)
+                if not os.path.exists(results_dir):
+                    os.makedirs(results_dir)
+
+                # Save the param file name and indices that this particular node should process
+                node_param_file = '%s/node_param_file.pkl' % results_dir
+                with open(node_param_file, 'wb') as npf:
+                    npf.write(pickle.dumps({key : values[node * 5:(node + 1) * 5]}))                 
+
+                sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s UoILasso &\n' % (script_dir, script, node_param_file, results_dir))
+    
+            sb.write('wait')
