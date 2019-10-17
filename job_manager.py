@@ -888,8 +888,21 @@ def assemble_necessary_tasks(jobdir):
 
 
 
-def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list):
-    pass
-    # 
+def gen_emergency_sbatch(original_jobdir, new_jobdir, uf_task_list):
 
+    # Divide the uf_task_list into equal 5 equal parts
+    
+    sublists = []
+    sublist.append({})
+    counter = 0
+    subidx = 0
+    for key, value in uf_task_list.items():
 
+        if counter > 26928:
+            subidx += 1
+            sublists.append({})
+
+        sublist[subidx][key] = value
+        counter += len(value)
+
+    pdb.set_trace()
