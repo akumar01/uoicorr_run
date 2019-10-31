@@ -130,7 +130,6 @@ def sparsify_beta(beta, block_size, sparsity, seed = None):
         mask = np.concatenate((mask, block_mask))
     mask = mask[..., np.newaxis]
     beta = beta * mask
-    print(beta.shape)
     return beta
 
 # Generate coefficients that are of the same magnitude within each block
