@@ -24,7 +24,7 @@ parser.add_argument('savepath')
 
 args = parser.parse_args()
 n = args.n
-S = args.S
+S_ = args.S
 savepath = args.savepath
 
 p = 250
@@ -37,25 +37,16 @@ numproc = comm.Get_size()
 sigma_sq = 1
 gamma_sq = 0.1
 
-S = np.linspace(5, 125, 25)
 F = np.linspace(0, 2 * np.log(n), 25)
 
-# Create tuples of unique combinations of S and F to distribute across ranks
-S_F = list(itertools.combinations([S, F]))
-S_F_idx = list(itertools.combinations([np.arange(S.size), np.arange(F.size)]))
-
-S_F_chunk = np.array_split(S_F, numproc)
-S_F_idx_chunk = np.array_split(S_F_chunk, numproc)
+F_chunk = np.array_split(F, numproc)
 
 # Storage
-cdf_vals = np.zeros((len(S_F_chunk[rank]), np.arange(1, p/2).size))
+cdf_vals = np.zeros((len(F_chunk[rank]), np.arange(1, p/2).size))
 
-for i, S_F_tuple in enumerate(S_F_chunk[rank]):
+for i, F_ in enumerate(F_chunk[rank]):
 
-    S_ = S_F_tuple[0]
-    F_ = S_F_tuple[1]
-
-    for i3, T in enumerate(np.arange(1, p/2)): 
+    for i3, T in enumerate(np.arange(1, 20, 2)): 
 
         t0 = time.time()
         dx2 = DChiSq(gamma_sq, sigma_sq, n - T, T)
@@ -65,7 +56,7 @@ for i, S_F_tuple in enumerate(S_F_chunk[rank]):
         # Calculate the CDF        
         p = dx2.nCDF(DeltaF)
         cdf_vals[i, i3] = p
-        print(time.time() - t0)
+        print('Rank %d: %d/%d, %f s' % (rank, i3, len(np.arange(1, 20, 2)), time.time() - t0))
             
 
 # Gather
@@ -75,7 +66,5 @@ cdf_vals = Gatherv_rows(cdf_vals, comm, root = 0)
 if rank == 0:
     with open(savepath, 'wb') as f:
         f.write(pickle.dumps(cdf_vals))
-        f.write(pickle.dumps(S_F_idx_chunk))
-        f.write(pickle.dumps(S))
+        f.write(pickle.dumps(S_))
         f.write(pickle.dumps(F))
-        f.write(pickle.dumps(T))
