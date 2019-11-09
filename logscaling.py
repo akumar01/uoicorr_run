@@ -11,7 +11,7 @@ from mpi4py import MPI
 from dchisq import DChiSq
 from mpi_utils.ndarray import Gatherv_rows
 
-# Log scaling
+# No scaling
 
 # Provide n, S, and the savepath through command line arguments
 
@@ -19,15 +19,14 @@ from mpi_utils.ndarray import Gatherv_rows
 parser = argparse.ArgumentParser()
 
 parser.add_argument('n', type=int)
-parser.add_argument('S', type=int)
+parser.add_argument('p', type=int)
 parser.add_argument('savepath')
 
 args = parser.parse_args()
 n = args.n
-S_ = args.S
+p = args.p
+S_ = int(np.log(p))
 savepath = args.savepath
-
-p = 250
 
 comm = MPI.COMM_WORLD
 rank = comm.rank
@@ -67,5 +66,5 @@ if rank == 0:
     with open(savepath, 'wb') as f:
         f.write(pickle.dumps(cdf_vals))
         f.write(pickle.dumps(n))
-        f.write(pickle.dumps(S_))
+        f.write(pickle.dumps(p))
         f.write(pickle.dumps(F))
