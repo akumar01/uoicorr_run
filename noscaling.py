@@ -46,7 +46,7 @@ cdf_vals = np.zeros((len(F_chunk[rank]), np.arange(1, p/2).size))
 
 for i, F_ in enumerate(F_chunk[rank]):
 
-    for i3, T in enumerate(np.linspace(1, p/2, 50, dtype=int)): 
+    for i3, T in enumerate(np.linspace(1, p/2, 25, dtype=int)): 
 
         t0 = time.time()
         dx2 = DChiSq(gamma_sq, sigma_sq, n - T, T)
@@ -56,7 +56,7 @@ for i, F_ in enumerate(F_chunk[rank]):
         # Calculate the CDF        
         p = dx2.nCDF(DeltaF)
         cdf_vals[i, i3] = p
-        print('Rank %d: %d/%d, %f s' % (rank, i3, len(np.arange(1, 20, 2)), time.time() - t0))
+        print('Rank %d: %d/%d, %f s' % (rank, i3, 50, time.time() - t0))
             
 
 # Gather

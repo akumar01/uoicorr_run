@@ -13,9 +13,11 @@ import copy
 # No scaling
 
 n = np.linspace(125, 1000, 10, dtype=int)
-S = np.linspace(5, 125, 25, dtype=int)
+S = np.linspace(5, 125, 15, dtype=int)
 
-n_S_combo = intertools.product(n, S)
+n_S_combo = list(itertools.product(n, S))
+
+n_nodes = len(n_S_combo)
 
 sbatch_dir = os.environ['SCRATCH'] + '/scaling/no_scaling'
 if not os.path.exists(sbatch_dir):
@@ -51,10 +53,10 @@ with open('no_scaling.sh', 'w') as sb:
 
 # Log scaling
 
-p = np.linspace(125, 1000, 10, dtype=int)
+p = np.linspace(500, 50000, 50, dtype=int)
 n = copy.deepcopy(p)
 
-n_p_combo = intertools.product(n, p)
+n_nodes = len(p)
 
 sbatch_dir = os.environ['SCRATCH'] + '/scaling/log_scaling'
 if not os.path.exists(sbatch_dir):
@@ -67,7 +69,7 @@ with open('log_scaling.sh', 'w') as sb:
 	sb.write('#SBATCH --qos=regular\n')
 	sb.write('#SBATCH --constraint=knl\n')            
 	sb.write('#SBATCH -N %d\n' % n_nodes)
-	sb.write('#SBATCH -t 01:30:00\n')
+	sb.write('#SBATCH -t 03:00:00\n')
 	sb.write('#SBATCH --job-name=%s\n' % 'logscaling')
 	sb.write('#SBATCH --out=%s/out.o\n' % sbatch_dir)
 	sb.write('#SBATCH --error=%s/error.e\n' % sbatch_dir)
@@ -82,17 +84,17 @@ with open('log_scaling.sh', 'w') as sb:
 	sb.write('export OMP_NUM_THREADS=1\n')
 	sb.write('export KMP_AFFINITY=disabled\n')
 
-	for node, n_p_tuple in enumerate(n_p_combo):
+	for node, p_ in enumerate(p):
 	    savepath = '%s/node%d.dat' % (sbatch_dir, node)
-	    sb.write('srun -N 1 -n 25 python3 -u logscaling.py %d %d %s &\n' % (n_p_tuple[0], n_p_tuple[1], savepath))
+	    sb.write('srun -N 1 -n 25 python3 -u logscaling.py %d %d %s &\n' % (n[node], p_, savepath))
 	sb.write('wait')
 
 # Linear scaling
 
-p = np.linspace(125, 1000, 10, dtype=int)
+p = np.linspace(500, 50000, 50, dtype=int)
 n = copy.deepcopy(p)
 
-n_p_combo = intertools.product(n, p)
+n_nodes = len(p)
 
 sbatch_dir = os.environ['SCRATCH'] + '/scaling/linear_scaling'
 if not os.path.exists(sbatch_dir):
@@ -105,7 +107,7 @@ with open('linear_scaling.sh', 'w') as sb:
 	sb.write('#SBATCH --qos=regular\n')
 	sb.write('#SBATCH --constraint=knl\n')            
 	sb.write('#SBATCH -N %d\n' % n_nodes)
-	sb.write('#SBATCH -t 01:30:00\n')
+	sb.write('#SBATCH -t 03:00:00\n')
 	sb.write('#SBATCH --job-name=%s\n' % 'linearscaling')
 	sb.write('#SBATCH --out=%s/out.o\n' % sbatch_dir)
 	sb.write('#SBATCH --error=%s/error.e\n' % sbatch_dir)
@@ -120,8 +122,8 @@ with open('linear_scaling.sh', 'w') as sb:
 	sb.write('export OMP_NUM_THREADS=1\n')
 	sb.write('export KMP_AFFINITY=disabled\n')
 
-	for node, n_p_tuple in enumerate(n_p_combo):
+	for node, p_ in enumerate(p):
 	    savepath = '%s/node%d.dat' % (sbatch_dir, node)
-	    sb.write('srun -N 1 -n 25 python3 -u linearscaling.py %d %d %s &\n' % (n_p_tuple[0], n_p_tuple[1], savepath))
+	    sb.write('srun -N 1 -n 25 python3 -u linearscaling.py %d %d %s &\n' % (n[node], p_, savepath))
 	sb.write('wait')
 

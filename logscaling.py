@@ -55,7 +55,7 @@ for i, F_ in enumerate(F_chunk[rank]):
         # Calculate the CDF        
         p = dx2.nCDF(DeltaF)
         cdf_vals[i, i3] = p
-        print('Rank %d: %d/%d, %f s' % (rank, i3, len(np.arange(1, 20, 2)), time.time() - t0))
+        print('Rank %d: %d/%d, %d/%d, %f s' % (rank, i + 1, len(F_chunk[rank]), i3, len(np.linspace(1, p/2, 50)), time.time() - t0))
             
 
 # Gather

@@ -902,12 +902,12 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list, ru
     # Divide the uf_task_list into equal 5 equal parts
 
     # Total unfinished tasks
-    total_tasks = np.sum([len(value) for value in uf_task_list.vales()])
+    total_tasks = np.sum([len(value) for value in uf_task_list.values()])
     
     nodes_required = int(np.ceil(total_tasks/tasks_per_node))
     n_jobs = int(np.ceil(nodes_required/n_nodes))
 
-    taks_per_job = int(np.ceil(total_tasks/n_job))
+    tasks_per_job = int(np.ceil(total_tasks/n_jobs))
 
     # Divide the uf_task_list into the task lists for each job
 
@@ -918,7 +918,7 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list, ru
     for key, value in uf_task_list.items():
         if len(value) == 0:
             continue
-        if counter > task_per_job:
+        if counter > tasks_per_job:
             subidx += 1
             sublists.append({})
             counter = 0
@@ -950,8 +950,8 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list, ru
             sb.write('#!/bin/bash\n')
             sb.write('#SBATCH --qos=premium\n')
             sb.write('#SBATCH --constraint=knl\n')            
-            sb.write('#SBATCH -N %d\n' % n_nodes)
-            sb.write('#SBATCH -t 01:30:00\n')
+            sb.write('#SBATCH -N %d\n' % min(n_nodes, len(tasklist)))
+            sb.write('#SBATCH -t %s\n' % runtime)
             sb.write('#SBATCH --job-name=%s\n' % jobname)
             sb.write('#SBATCH --out=%s/%s.o\n' % (sbatch_dir, jobname))
             sb.write('#SBATCH --error=%s/%s.e\n' % (sbatch_dir, jobname))
@@ -977,12 +977,13 @@ def gen_emergency_sbatch(original_jobdir, new_jobdir, exp_type, uf_task_list, ru
                 # Save the param file name and indices that this particular node should process
                 node_param_file = '%s/node_param_file.pkl' % results_dir
                 with open(node_param_file, 'wb') as npf:
-                    npf.write(pickle.dumps({key : split_vals[j]}))                 
+                    npf.write(pickle.dumps({key : value}))                 
 
                 sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s %s &\n' % (script_dir, script, node_param_file, results_dir, exp_type))
                 node += 1
 
             sb.write('wait')
+            print(node)
 
 def gen_debug(original_jobdir, new_jobdir, uf_task_list):
 
