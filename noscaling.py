@@ -23,24 +23,28 @@ class Worker(object):
         self.S = S
 
     def CDFcalc(self, T, F):
-
+        print('CDFcalcing!')
         t0 = time.time()
         dx2 = DChiSq(self.gamma_sq, self.sigma_sq, n - T, T)
         DeltaF = F * (self.S - T)
         # Calculate the CDF        
         p = dx2.nCDF(DeltaF)
-
+         #p = T * F
         # Log what process is working on which task
         print('Rank %d: T: %d, F: %d, %f s' % (rank, T, F, time.time() - t0))
 
         return p, T, F
 
-    def save(self, result, T, F)
+    def save(self, result):
+
+        p = result[0]
+        T = result[1]
+        F = result[2]
 
         # Save each individual task away as a separate pickle file
         with open('%s/%d_%d.dat' % (self.savepath, T, F), 'wb') as f:
 
-            f.write(pickle.dumps(result))
+            f.write(pickle.dumps(p))
             f.write(pickle.dumps(T))
             f.write(pickle.dumps(F))
             f.write(pickle.dumps(self.S))
@@ -83,17 +87,16 @@ if __name__ == '__main__':
     sigma_sq = 1
     gamma_sq = 0.1
 
-    F = np.linspace(0, 2 * np.log(n), 25)
-    T = np.linspace(1, p/2, 25, dtype=int)
+    F = np.linspace(0, 2 * np.log(n), 10)
+    T = np.linspace(1, p, 25, dtype=int)
 
     pool = MPIPool(comm)
 
     worker = Worker(savepath, gamma_sq, sigma_sq, n, S_)
 
     # Split F and T into tasks
-    tasks = zip(F, T)
+    tasks = itertools.product(T, F)
 
-    for r in pool.map(worker, tasks, callback = worker.save):
-        pass
-
+    pool.map(worker, tasks, callback = worker.save)
+    
     pool.close()

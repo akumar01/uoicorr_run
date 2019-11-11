@@ -13,7 +13,7 @@ import copy
 # No scaling
 
 n = np.linspace(125, 1000, 10, dtype=int)
-S = np.linspace(5, 125, 15, dtype=int)
+S = np.linspace(5, 250, 20, dtype=int)
 
 n_S_combo = list(itertools.product(n, S))
 
@@ -27,10 +27,10 @@ with open('no_scaling.sh', 'w') as sb:
 
 	# For each combination of n and S, create a line in the sbatch file
 	sb.write('#!/bin/bash\n')
-	sb.write('#SBATCH --qos=regular\n')
+	sb.write('#SBATCH --qos=premium\n')
 	sb.write('#SBATCH --constraint=knl\n')            
 	sb.write('#SBATCH -N %d\n' % n_nodes)
-	sb.write('#SBATCH -t 01:30:00\n')
+	sb.write('#SBATCH -t 02:00:00\n')
 	sb.write('#SBATCH --job-name=%s\n' % 'noscaling')
 	sb.write('#SBATCH --out=%s/out.o\n' % sbatch_dir)
 	sb.write('#SBATCH --error=%s/error.e\n' % sbatch_dir)
@@ -46,11 +46,14 @@ with open('no_scaling.sh', 'w') as sb:
 	sb.write('export KMP_AFFINITY=disabled\n')
 
 	for node, n_S_tuple in enumerate(n_S_combo):
-	    savepath = '%s/node%d.dat' % (sbatch_dir, node)
+        if not os.path.exists('%s/node%d' % (sbatch_dir, node)):
+            os.makedirs(sbatch_dir)
+
+        savepath = '%s/node%d' % (sbatch_dir, node)
 	    sb.write('srun -N 1 -n 25 python3 -u noscaling.py %d %d %s &\n' % (n_S_tuple[0], n_S_tuple[1], savepath))
 	sb.write('wait')
 
-
+'''
 # Log scaling
 
 p = np.linspace(500, 50000, 50, dtype=int)
@@ -126,4 +129,4 @@ with open('linear_scaling.sh', 'w') as sb:
 	    savepath = '%s/node%d.dat' % (sbatch_dir, node)
 	    sb.write('srun -N 1 -n 25 python3 -u linearscaling.py %d %d %s &\n' % (n[node], p_, savepath))
 	sb.write('wait')
-
+'''
