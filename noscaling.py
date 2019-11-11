@@ -7,65 +7,93 @@ import argparse
 import itertools
 import pickle
 from mpi4py import MPI
+from schwimmbad import MPIPool
 
 from dchisq import DChiSq
 from mpi_utils.ndarray import Gatherv_rows
 
-# Log scaling
+class Worker(object):
 
-# Provide n, S, and the savepath through command line arguments
+    def __init__(self, savepath, gamma_sq, sigma_sq, n, S):
 
-###### Command line arguments #######
-parser = argparse.ArgumentParser()
+        self.savepath = savepath
+        self.gamma_sq = gamma_sq
+        self.sigma_sq = sigma_sq
+        self.n = n
+        self.S = S
 
-parser.add_argument('n', type=int)
-parser.add_argument('S', type=int)
-parser.add_argument('savepath')
-
-args = parser.parse_args()
-n = args.n
-S_ = args.S
-savepath = args.savepath
-
-p = 250
-
-comm = MPI.COMM_WORLD
-rank = comm.rank
-numproc = comm.Get_size()
-
-# Keep sigma and gamma squared equal to each other
-sigma_sq = 1
-gamma_sq = 0.1
-
-F = np.linspace(0, 2 * np.log(n), 25)
-
-F_chunk = np.array_split(F, numproc)
-
-# Storage
-cdf_vals = np.zeros((len(F_chunk[rank]), np.arange(1, p/2).size))
-
-for i, F_ in enumerate(F_chunk[rank]):
-
-    for i3, T in enumerate(np.linspace(1, p/2, 25, dtype=int)): 
+    def CDFcalc(self, T, F):
 
         t0 = time.time()
-        dx2 = DChiSq(gamma_sq, sigma_sq, n - T, T)
-        
-        DeltaF = F_ * (S_ - T)
-        
+        dx2 = DChiSq(self.gamma_sq, self.sigma_sq, n - T, T)
+        DeltaF = F * (self.S - T)
         # Calculate the CDF        
         p = dx2.nCDF(DeltaF)
-        cdf_vals[i, i3] = p
-        print('Rank %d: %d/%d, %f s' % (rank, i3, 50, time.time() - t0))
-            
 
-# Gather
-cdf_vals = Gatherv_rows(cdf_vals, comm, root = 0)
+        # Log what process is working on which task
+        print('Rank %d: T: %d, F: %d, %f s' % (rank, T, F, time.time() - t0))
 
-# Save
-if rank == 0:
-    with open(savepath, 'wb') as f:
-        f.write(pickle.dumps(cdf_vals))
-        f.write(pickle.dumps(n))
-        f.write(pickle.dumps(S_))
-        f.write(pickle.dumps(F))
+        return p, T, F
+
+    def save(self, result, T, F)
+
+        # Save each individual task away as a separate pickle file
+        with open('%s/%d_%d.dat' % (self.savepath, T, F), 'wb') as f:
+
+            f.write(pickle.dumps(result))
+            f.write(pickle.dumps(T))
+            f.write(pickle.dumps(F))
+            f.write(pickle.dumps(self.S))
+            f.write(pickle.dumps(self.n))
+            f.write(pickle.dumps(self.sigma_sq))
+            f.write(pickle.dumps(self.gamma_sq))
+
+
+    def __call__(self, task):
+
+        T, F = task
+        return self.CDFcalc(T, F)
+
+
+if __name__ == '__main__':
+
+    # Log scaling
+
+    # Provide n, S, and the savepath through command line arguments
+
+    ###### Command line arguments #######
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('n', type=int)
+    parser.add_argument('S', type=int)
+    parser.add_argument('savepath')
+
+    args = parser.parse_args()
+    n = args.n
+    S_ = args.S
+    savepath = args.savepath
+
+    p = 250
+
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
+    numproc = comm.Get_size()
+
+    # Keep sigma and gamma squared equal to each other
+    sigma_sq = 1
+    gamma_sq = 0.1
+
+    F = np.linspace(0, 2 * np.log(n), 25)
+    T = np.linspace(1, p/2, 25, dtype=int)
+
+    pool = MPIPool(comm)
+
+    worker = Worker(savepath, gamma_sq, sigma_sq, n, S_)
+
+    # Split F and T into tasks
+    tasks = zip(F, T)
+
+    for r in pool.map(worker, tasks, callback = worker.save):
+        pass
+
+    pool.close()
