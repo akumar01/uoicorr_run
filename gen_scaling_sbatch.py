@@ -47,7 +47,7 @@ with open('no_scaling.sh', 'w') as sb:
 
     for node, n_S_tuple in enumerate(n_S_combo):
         if not os.path.exists('%s/node%d' % (sbatch_dir, node)):
-            os.makedirs(sbatch_dir)
+            os.makedirs('%s/node%d' % (sbatch_dir, node))
 
         savepath = '%s/node%d' % (sbatch_dir, node)
         sb.write('srun -N 1 -n 25 python3 -u noscaling.py %d %d %s &\n' % (n_S_tuple[0], n_S_tuple[1], savepath))

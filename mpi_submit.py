@@ -30,7 +30,7 @@ def manage_comm():
 
     if args.comm_splits is None:
         if args.exp_type in ['UoILasso', 'UoIElasticNet']:
-            comm_splits = 64
+            comm_splits = 2
         else:
             comm_splits = numproc
     else:

@@ -96,6 +96,20 @@ def calc_result(X, X_test, y, y_test, beta, field, exp_results):
 
         result = mean_squared_error(y_test, X_test @ exp_results['oracle_coefs'])
 
+    elif field == 'bias':
+    
+        result = beta_hat - beta
+
+    elif field == 'reduced_bias':
+        
+        # Limit to the correctly chosen coefficients
+        
+        # Normalize to yield the "average bias per coefficient"
+
+        # common support
+        common_support = list(set(np.nonzero(beta_hat)).intersect(set(np.nonzero(beta))))
+        result = (beta_hat[support] - beta[support])/len(support)
+
     else:
         raise ValueError('field type %s not understood' % field)
 

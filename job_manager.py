@@ -268,7 +268,6 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
 
     # Copy submit file to jobdir
     os.system('cp %s %s/' % (submit_file, jobdir))
-    pdb.set_trace()
     iter_params = args.iter_params
     comm_params = args.comm_params
     if exp_types is None:
