@@ -251,12 +251,73 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
                      % (script_dir, script, sbatch['arg_file'],
                      results_file, sbatch['exp_type']))
 
+def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
+
+    total_tasks = len(sbatch_array)
+    n_chunks = ceil(total_tasks/n_nodes).astype(int)
+    # Distribute elements of sbatch_array across nodes
+
+    chunked_sbatch_array = np.array_split(sbatch_array, n_chunks)
+
+    for i1, chunk in enumerate(chunked_sbatch_array):
+
+        # We will take the metadata from the first element in the
+        # sbatch array chunk
+        qos = chunk[0]['qos']
+
+        if 'sbname' not in list(chunk[0].keys()):
+            sbname = 'sbatch%d.sh' % i
+        else:
+            sbname = chunk[0]['sbname']
+
+        sbname = '%s/%s' % (sbatch_dir, sbname)
+        script = 'mpi_submit.py'
+
+        with open(sbname, 'w') as sb:
+
+            if 'jobname' not in list(chunk[0].keys()):
+                jobname = '%s_job%d' % (chunk[0]['exp_type'], i1)
+            else:
+                jobname = sbatch['jobname']
+
+            # Arguments common across jobs
+            sb.write('#!/bin/bash\n')
+            sb.write('#SBATCH --qos=%s\n' % qos)
+            sb.write('#SBATCH --constraint=knl\n')            
+            sb.write('#SBATCH -N %d\n' % n_nodes)
+            sb.write('#SBATCH -t %s\n' % chunk[0]['job_time'])
+            sb.write('#SBATCH --job-name=%s\n' % jobname)
+            sb.write('#SBATCH --out=%s/%s.o\n' % (sbatch_dir, jobname))
+            sb.write('#SBATCH --error=%s/%s.e\n' % (sbatch_dir, jobname))
+            sb.write('#SBATCH --mail-user=ankit_kumar@berkeley.edu\n')
+            sb.write('#SBATCH --mail-type=FAIL\n')
+            # Work with out own Anaconda environment
+            # To make this work, we had to add some paths to our .bash_profile.ext
+            sb.write('source ~/anaconda3/bin/activate\n')
+            sb.write('source activate nse\n')
+
+            # Critical to prevent threads competing for resources
+            sb.write('export OMP_NUM_THREADS=1\n')
+            sb.write('export KMP_AFFINITY=disabled\n')
+
+            for i2, task in enumerate(chunk):
+
+                # results files need to be handled separately for each line
+                results_file = '%s/%s_%d' % (sbatch_dir, jobname, i2)
+                sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s %s &\n' % \
+                         (script_dir, script, task['arg_file'], results_dir, task['exp_type']))
+
+            sb.write('wait')
+
+
+
 # Use skip_argfiles if arg_files have already been generated and just need to
 # re-gen sbatch files
 
 # srun_opts: options to feed into the srun command (for example, n tasks, n cpus per task)
 def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
-                         skip_argfiles = False, single_test = False, exp_types=None):
+                         skip_argfiles = False, single_test = False, exp_types=None,
+                         n_nodes=100):
 
     if not os.path.exists(jobdir):
         os.makedirs(jobdir)
@@ -342,8 +403,11 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         if not os.path.exists('%s/%s' % (jobdir, exp_type)):
             os.mkdir('%s/%s' % (jobdir, exp_type))
 
-        generate_sbatch_scripts(sbatch_array[i], '%s/%s' % (jobdir, exp_type),
-                                script_dir)
+        # generate_sbatch_scripts(sbatch_array[i], '%s/%s' % (jobdir, exp_type),
+        #                         script_dir)
+        gen_sbatch_multinode(sbatch_array[i], '%s/%s' % (jobdir, exp_type),
+                             script_dir, n_nodes)
+
 
 def regen_sbatch_scripts(jobdir, script_dir, run_files, sbatch_dict):
 
@@ -392,48 +456,48 @@ def run_jobs(jobdir, constraint, size = None, nums = None, run_files = None,
             # Need to open up the file and include the particular constraint
             # On Edison - remove any constraints
             # On Cori - can have either KNL or Haswell
-            f = open(run_file, 'r')
-            contents = f.readlines()
-            f.close()
+            # f = open(run_file, 'r')
+            # contents = f.readlines()
+            # f.close()
 
-            constraint_string = [s for s in contents if '--constraint' in s]
+            # constraint_string = [s for s in contents if '--constraint' in s]
 
-            # First remove any existing constraint strings
-            if len(constraint_string) > 0:
-                for c in constraint_string:
-                    contents.remove(c)
+            # # First remove any existing constraint strings
+            # if len(constraint_string) > 0:
+            #     for c in constraint_string:
+            #         contents.remove(c)
 
-            # Add constraint after declaration of qos
-            if constraint == 'haswell':
-                contents.insert(2, '#SBATCH --constraint=haswell\n')
+            # # Add constraint after declaration of qos
+            # if constraint == 'haswell':
+            #     contents.insert(2, '#SBATCH --constraint=haswell\n')
 
-            if constraint == 'knl':
-                contents.insert(2, '#SBATCH --constraint=knl\n')
+            # if constraint == 'knl':
+            #     contents.insert(2, '#SBATCH --constraint=knl\n')
 
-            f = open(run_file, "w")
-            contents = "".join(contents)
-            f.write(contents)
-            f.close()
+            # f = open(run_file, "w")
+            # contents = "".join(contents)
+            # f.write(contents)
+            # f.close()
 
             # Append a resume flag
             if resume:
-                f = open(run_file, 'r')
-                contents = f.readlines()
+                # f = open(run_file, 'r')
+                # contents = f.readlines()
 
-                f.close()
-                # Last line needs to be modified
-                last_line = contents[-1]
-                srun_statement = last_line.split('\n')[0]
+                # f.close()
+                # # Last line needs to be modified
+                # last_line = contents[-1]
+                # srun_statement = last_line.split('\n')[0]
 
-                if not srun_statement.endswith(' -r'):
-                    srun_statement += ' -r'
-                contents[-1] = srun_statement + '\n'
+                # if not srun_statement.endswith(' -r'):
+                #     srun_statement += ' -r'
+                # contents[-1] = srun_statement + '\n'
 
-                f = open(run_file, 'w')
-                contents = "".join(contents)
-                f.write(contents)
-                f.close()
-
+                # f = open(run_file, 'w')
+                # contents = "".join(contents)
+                # f.write(contents)
+                # f.close()
+                pass 
             if run:
                 run_(run_file)
 
