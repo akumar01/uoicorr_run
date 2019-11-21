@@ -6,7 +6,7 @@ import pickle
 from mpi4py import MPI
 
 import numpy as np
-from np.random import RandomState
+from numpy.random import RandomState
 
 from scipy.sparse.linalg import eigsh
 from scipy import optimize
@@ -16,7 +16,7 @@ from sklearn.preprocessing import StandardScaler
 
 from mpi_utils.ndarray import Gatherv_rows
 
-from utils import gen_covariance, gen_data, sparsify_beta
+from utils import gen_covariance, gen_data, sparsify_beta, get_cov_list
 
 def bound_eigenvalue(matrix, k):
 
@@ -86,13 +86,13 @@ if __name__ == '__main__':
 
     # generate the standard covariance ensemble
     p = 500
-    n = 2000
-    block_sizes = [25, 50, 100]
-    # Block correlation
-    correlation = [0, 0.08891397, 0.15811388, 0.28117066, 0.5]
+    
+    # Tune the strength of perturbation
+    n = np.linspace(500, 8000 * 8, 10)
 
-    # Exponential length scales
-    L = [10, 25, 50, 100]
+    # Load the covariance parameters
+    with open('unique_cov_params.dat', 'rb') as f:
+        cov_params = pickle.load(f)
 
     # How many Wishart matrices to generate
     nreps = 20
@@ -100,77 +100,77 @@ if __name__ == '__main__':
     # How many instantiations of data from that matrix to take (needed to calculate the irrep constant)
     nreps2 = 20
 
-
-    if comm.rank == 0:
-
-        cov_list, _ = get_cov_list(p, 60, correlation, block_sizes, L, n_supplement = 20)
-
-        cov_params = [{'correlation' : t[0], 'block_size' : t[1], 'L' : t[2], 't': t[3]} for t in cov_list]
-
-    else:
-
-        cov_params = None
-
-    cov_params  = comm.bcast(cov_params, root=0)
-
     # Do not include fully dense model
     sparsity = np.logspace(np.log10(0.02), 0, 15)[:-1]
 
     # Chunk the cov params
     cov_params_chunk = np.array_split(cov_params, comm.size)
 
-    rho = np.zeros((len(cov_params_chunk[comm.rank]), nreps, sparsity.size))
-    eta = np.zeros((len(cov_params_chunk[comm.rank]), nreps, sparsity.size, nreps2))        
+    rho = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps))
+    eta = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps, sparsity.size, nreps2))        
+    eta2 = np.zeros(eta.size)
+    norm_diff = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps))
 
     for i1, cov_param in enumerate(cov_params_chunk[comm.rank]):
-        
-        t0 = time.time()
-        
+        print('Rank %d starting task %d' % (comm.rank, i1))
         # Generate Wishart matrices seeded by this particular sigma
         sigma = gen_covariance(p, **cov_param)
-        
-        for rep in range(nreps):
-            # Generate a random seed uniquely corresponding to combination of i1 and rep:
-            # Utilizes the Cantor pairing function
-            rand_seed = int(1/2 * (i1 + rep) * (i1 + rep + 1) + rep)
-            random_state = RandomState(rand_seed)
+        for nidx, n_ in enumerate(n):         
+            # t0 = time.time()
+       
+            for rep in range(nreps):
+                t0 = time.time()  
+                # Seed to be able to reconstruct the matrix later
+                random_state = RandomState(rep)
+                sigma_rep = wishart.rvs(df=n_, scale=sigma, random_state=random_state)
+                # Normalize the matrix 
+                D = np.sqrt(np.diag(np.diag(sigma_rep)))
+                sigma_rep = np.linalg.inv(D) @ sigma_rep @ np.linalg.inv(D)            
+                # sigma_rep = sigma
+                norm_diff[i1, nidx, rep] = np.linalg.norm(sigma_rep - sigma, 'fro')            
+                try:
+                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep, 1, which='LM', return_eigenvectors=False, maxiter=10000))
+                except:
+                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep, 1, which='LM', return_eigenvectors=False, maxiter=10000, tol=1e-2))
+                for i3, s in enumerate(sparsity):
+#                    t0 = time.time()
+                    # Keep the nonzero components of beta fixed for each sparsity
+                    # Here, we ensure that blocks are treated equally
                 
-            sigma_rep = wishart.rvs(df=n, scale=sigma, random_state=random_state)
-            
-            for i3, s in enumerate(sparsity):
-                # Keep the nonzero components of beta fixed for each sparsity
-                # Here, we ensure that blocks are treated equally
-                
-                subset = sparsify_beta(np.ones((p, 1), dtype=int), block_size=cov_param['block_size'], 
+                    subset = sparsify_beta(np.ones((p, 1), dtype=int), block_size=cov_param['block_size'], 
                                        sparsity = s, seed = s).ravel()
-                if len(np.nonzero(subset)[0]) == 0:
-                    rho[i1, rep, i3] = np.nan
-                    eta[i1, rep, i3, :] = np.nan
-                    continue
+                    if len(np.nonzero(subset)[0]) == 0:
+                        eta[i1, nidx, rep, i3, :] = np.nan
+                        eta2[i1, nidx, rep, i3] = np.nan
+                        continue
 
-                else:
-                    rho_ = 1/calc_eigenvalue(np.linalg.inv(sigma_rep), np.nonzero(subset)[0])
-                    rho[i1, rep, i3] = rho_ 
-                    
-                    for rep2 in range(nreps2):            
+                    else:
+                        eta2[i1, nidx, rep, i3] = calc_irrep_const(sigma_rep, np.nonzero(subset)[0])               
+                        
+                        for rep2 in range(nreps2):         
                 
-                        X, _, _, _, _ = gen_data(n, p, covariance = sigma_rep, beta=subset.ravel())
-                        # Normalize X
-                        X = StandardScaler().fit_transform(X)
-                        C = 1/n * X.T @ X
-                        eta[i1, rep, i3, rep2] = calc_irrep_const(C, np.nonzero(subset)[0])
-                            
+                            X, _, _, _, _ = gen_data(2000, p, covariance = sigma_rep, beta=subset.ravel())
+                            # Normalize X
+                            X = StandardScaler().fit_transform(X)
+                            C = 1/n_ * X.T @ X
+                            eta[i1, nidx, rep, i3, rep2] = calc_irrep_const(C, np.nonzero(subset)[0])                            
                     
-                    
-        print(time.time() - t0)        
-        print('%d/%d' % (i1 + 1, len(cov_params)))
+                if comm.rank == 0:    
+                    print(time.time() - t0)        
+        
+        print('%d/%d' % (i1 + 1, len(cov_params_chunk[comm.rank])))
     
 
     # Gather and save results
     rho = Gatherv_rows(rho, comm, root = 0)
     eta = Gatherv_rows(eta, comm, root = 0)
+    eta2 = Gatherv_rows(eta2, comm, root = 0)
+    norm_diff = Gatherv_rows(norm_diff, comm, root = 0)
+
 
     if comm.rank == 0:
         with open('cov_ensemble.dat', 'wb') as f:
             f.write(pickle.dumps(rho))
             f.write(pickle.dumps(eta))
+            f.write(pickle.dumps(eta2))
+            f.write(pickle.dumps(norm_diff))
