@@ -254,7 +254,7 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
 def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
 
     total_tasks = len(sbatch_array)
-    n_chunks = ceil(total_tasks/n_nodes).astype(int)
+    n_chunks = np.ceil(total_tasks/n_nodes).astype(int)
     # Distribute elements of sbatch_array across nodes
 
     chunked_sbatch_array = np.array_split(sbatch_array, n_chunks)
@@ -266,7 +266,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
         qos = chunk[0]['qos']
 
         if 'sbname' not in list(chunk[0].keys()):
-            sbname = 'sbatch%d.sh' % i
+            sbname = 'sbatch%d.sh' % i1
         else:
             sbname = chunk[0]['sbname']
 
@@ -303,7 +303,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
             for i2, task in enumerate(chunk):
 
                 # results files need to be handled separately for each line
-                results_file = '%s/%s_%d' % (sbatch_dir, jobname, i2)
+                results_dir = '%s/%s_%d' % (sbatch_dir, jobname, i2)
                 sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s %s &\n' % \
                          (script_dir, script, task['arg_file'], results_dir, task['exp_type']))
 
@@ -379,6 +379,9 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         # Need to get paths and ntasks
         paths = glob('%s/master/*.dat' % jobdir)
 
+        # Sort naturally
+        paths = natsort.natsorted(paths)
+    
     # Create an sbatch_array used to generate sbatch files that specifies exp_type, job_time,
     # num_tasks, and the path to the corresponding arg_file
 
