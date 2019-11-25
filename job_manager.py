@@ -533,22 +533,18 @@ def run_(run_file):
     os.system('chmod u+x %s' % run_file)
     os.system('sbatch %s' % run_file)
 
-# Sequentially run files locally:
+# Rework run jobs local to output a shell script that is sequentially executed
 def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = None,
                    script_path=None, exec_str = 'srun'):
-    # Crawl through all subdirectories and
-    # (1) Grab the sbatch files
-    # (2) Extract the srun statement
-    # (3) Replace srun with exec_str -n nprocs
-    # (4) Replace script and data dirs with local machine paths
-    # (5) Run
+
+    mpi_strings = []
 
     if run_files is None:
         run_files = grab_files(jobdir, '*.sh', exp_type)
 
     if size is not None:
         run_files = run_files[:size]
-    cont = input("You are about to submit %d jobs, do you want to continue? [0/1]" % len(run_files))
+    cont = input("You are about to run %d jobs, do you want to continue? [0/1]" % len(run_files))
 
     if cont:
         for run_file in run_files:
@@ -571,28 +567,18 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
             if script_path is not None:
                 mpi_string[5] = script_path
 
-            # Replace the data path with the local machine path, if they are
-            # not the same
-            # run_file_root_path = '/'.join(run_file.split('/')[:-2])
-            # mpi_string_suffix = '/'.join(mpi_string[6].split('/')[-2:])
-            # mpi_string[6] = run_file_root_path + '/%s' % mpi_string_suffix
+            mpi_strings.extend(mpi_string)
 
-            # mpi_string_suffix = '/'.join(mpi_string[7].split('/')[-2:])
-            # mpi_string[7] = run_file_root_path + '/%s' % mpi_string_suffix
 
-            for output in local_exec(mpi_string):
-                print(output)
+    # Write to a shell script 
+    with open('run_jobs_local_temp.sh', 'w') as f:
+        f.write('#!/bin/bash\n')
+        for mpi_string in mpi_strings:
+            f.write(''.join(mpi_string) + '&\n')
+            f.write('wait\n')
 
-# Copied from this stackoverflow post: https://stackoverflow.com/questions/4417546/constantly-print-subprocess-output-while-process-is-running
-# Capture stdout in real time
-def local_exec(cmd):
-    popen = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
-    for stdout_line in iter(popen.stdout.readline, ""):
-        yield stdout_line
-    popen.stdout.close()
-    return_code = popen.wait()
-    if return_code:
-        raise subprocess.CalledProcessError(return_code, cmd)
+    # Execute
+    subprocess.check_output(['./run_jobs_local_temp.sh'])    
 
 # Edit specific lines of the provided sbatch files (full paths)
 # By default, edits an attribute
