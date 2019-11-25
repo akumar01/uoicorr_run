@@ -8,7 +8,7 @@ script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
 
 ###### Master list of parameters to be iterated over #######
 
-exp_types =  ['CV_Lasso', 'scad']
+exp_types =  ['UoILasso']
 
 # Estimated worst case run-time for a single repitition for each algorithm in exp_types 
 algorithm_times = ['2:00:00', '00:30:00', '00:30:00']
@@ -66,11 +66,11 @@ comm_params = {
 'reps' : 5,
 'stability_selection' : [0.75],
 'n_boots_sel': 25,
-'n_boots_est' : 25,
+'n_boots_est' : [25, 50, 75, 100],
 'betadict' : beta_dict,
 # Inverse Signal to noise ratio
 'kappa' : [5],
-'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio']
+'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio', 'n_boots_est']
 }
 
 # Parameters for ElasticNet

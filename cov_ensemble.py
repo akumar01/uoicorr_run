@@ -91,7 +91,7 @@ if __name__ == '__main__':
     n = np.linspace(500, 8000 * 8, 10)
 
     # Load the covariance parameters
-    with open('unique_cov_params.dat', 'rb') as f:
+    with open('unique_cov_param.dat', 'rb') as f:
         cov_params = pickle.load(f)
 
     # How many Wishart matrices to generate
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     rho = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps))
     eta = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps, sparsity.size, nreps2))        
-    eta2 = np.zeros(eta.size)
+    eta2 = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps, sparsity.size))
     norm_diff = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps))
 
     for i1, cov_param in enumerate(cov_params_chunk[comm.rank]):
@@ -129,9 +129,9 @@ if __name__ == '__main__':
                 # sigma_rep = sigma
                 norm_diff[i1, nidx, rep] = np.linalg.norm(sigma_rep - sigma, 'fro')            
                 try:
-                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep, 1, which='LM', return_eigenvectors=False, maxiter=10000))
+                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep), 1, which='LM', return_eigenvectors=False, maxiter=10000)
                 except:
-                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep, 1, which='LM', return_eigenvectors=False, maxiter=10000, tol=1e-2))
+                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep), 1, which='LM', return_eigenvectors=False, maxiter=10000, tol=1e-2)
                 for i3, s in enumerate(sparsity):
 #                    t0 = time.time()
                     # Keep the nonzero components of beta fixed for each sparsity

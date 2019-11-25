@@ -110,12 +110,11 @@ def gen_data_(params, subcomm, subrank):
         y_test = None
         ss = None
 
-
     X = Bcast_from_root(X, subcomm)
     X_test = Bcast_from_root(X_test, subcomm)
     y = Bcast_from_root(y, subcomm)
     y_test = Bcast_from_root(y_test, subcomm)
-    ss = Bcast_from_root(ss, subcomm)
+    # ss = Bcast_from_root(ss, subcomm)
 
     params['ss'] = ss
 

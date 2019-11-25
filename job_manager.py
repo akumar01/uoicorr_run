@@ -535,7 +535,7 @@ def run_(run_file):
 
 # Sequentially run files locally:
 def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = None,
-                   script_dir=None, exec_str = 'srun'):
+                   script_path=None, exec_str = 'srun'):
     # Crawl through all subdirectories and
     # (1) Grab the sbatch files
     # (2) Extract the srun statement
@@ -556,23 +556,29 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
                 fcontents = f.readlines()
 
             srun_string = [s for s in fcontents if 'srun' in s][0]
-
+    
             # replace srun with mpiexec -nprocs
-            mpi_string = srun_string.replace('srun', '%s -n %d' % (exec_str, nprocs))
+            mpi_string = srun_string.replace('srun', exec_str)
             mpi_string = split(mpi_string)
+            
+            del_indices = [1, 2, 5, 6, len(mpi_string) - 1]
+
+            # Delete superflous indices        
+            for index in sorted(del_indices, reverse=True):
+                del mpi_string[index]
 
             # Replace script and data dirs with local machine paths
-            if script_dir is not None:
-                mpi_string[5] = script_dir
+            if script_path is not None:
+                mpi_string[5] = script_path
 
             # Replace the data path with the local machine path, if they are
             # not the same
-            run_file_root_path = '/'.join(run_file.split('/')[:-2])
-            mpi_string_suffix = '/'.join(mpi_string[6].split('/')[-2:])
-            mpi_string[6] = run_file_root_path + '/%s' % mpi_string_suffix
+            # run_file_root_path = '/'.join(run_file.split('/')[:-2])
+            # mpi_string_suffix = '/'.join(mpi_string[6].split('/')[-2:])
+            # mpi_string[6] = run_file_root_path + '/%s' % mpi_string_suffix
 
-            mpi_string_suffix = '/'.join(mpi_string[7].split('/')[-2:])
-            mpi_string[7] = run_file_root_path + '/%s' % mpi_string_suffix
+            # mpi_string_suffix = '/'.join(mpi_string[7].split('/')[-2:])
+            # mpi_string[7] = run_file_root_path + '/%s' % mpi_string_suffix
 
             for output in local_exec(mpi_string):
                 print(output)

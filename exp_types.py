@@ -158,7 +158,8 @@ class UoILasso():
                        X, y, selection_method):
 
         if not hasattr(self, 'fitted_estimator'):
-            
+            print(args['n_boots_sel'])
+            print(args['n_boots_est']) 
             # If not yet fitted, run the pycasso lasso
             t0 = time.time()
             uoi = UoI_Lasso(
