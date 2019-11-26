@@ -170,7 +170,7 @@ class UoILasso():
                 stability_selection = args['stability_selection'],
                 n_lambdas = self.n_alphas,
                 comm = comm, 
-                solver = 'pyc'
+                solver = 'cd'
                 )
             if rank == 0:
                 print('Fitting!')

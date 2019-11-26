@@ -567,18 +567,34 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
             if script_path is not None:
                 mpi_string[5] = script_path
 
-            mpi_strings.extend(mpi_string)
+            mpi_strings.append(mpi_string)
 
 
     # Write to a shell script 
     with open('run_jobs_local_temp.sh', 'w') as f:
         f.write('#!/bin/bash\n')
         for mpi_string in mpi_strings:
-            f.write(''.join(mpi_string) + '&\n')
-            f.write('wait\n')
+            f.write(' '.join(mpi_string) + '\n')
+
+    # Change permission
+    os.chmod('run_jobs_local_temp.sh', 0o777)
 
     # Execute
-    subprocess.check_output(['./run_jobs_local_temp.sh'])    
+    # for output in local_exec('./run_jobs_local_temp.sh'):
+    #    print(output)
+
+def local_exec(cmd):
+    popen = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
+    
+    for stdout_line in iter(popen.stdout.readline, ""):
+        yield stdout_line
+    
+    popen.stdout.close()
+    
+    return_code = popen.wait()
+    
+    if return_code:
+        raise subprocess.CalledProcessError(return_code, cmd)
 
 # Edit specific lines of the provided sbatch files (full paths)
 # By default, edits an attribute
