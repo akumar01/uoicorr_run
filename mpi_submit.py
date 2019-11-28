@@ -152,7 +152,7 @@ def main(args):
 
     # Take the complement of inserted_idxs in the results manager
     task_list = np.array(list(set(np.arange(total_tasks)).difference(set(rmanager.inserted_idxs()))))
-    chunk_param_list = np.array_split(np.arange(len(task_list)), comm_splits)
+    chunk_param_list = np.array_split(task_list, comm_splits)
     chunk_idx = color
     num_tasks = len(chunk_param_list[chunk_idx])
 
