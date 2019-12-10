@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LassoCV
 from pyuoi import UoI_Lasso
 from pyc_based.pycasso_cv import PycassoCV
-from utils import gen_covariance, gen_beta2, gen_data, calc_avg_cov
+from utils import gen_covariance, gen_beta2, gen_data, calc_avg_cov, get_cov_list
 
 from mpi4py import MPI
 from schwimmbad import MPIPool
@@ -23,8 +23,16 @@ class Worker(object):
         self.n_features = n_features
         self.n_samples = n_samples
         self.cov_params = cov_params
+    
+        self.beta = []
+        self.beta_hat = []
+        self.task_signature = []
 
-    def __call__(self, cov_param_idx, rep, algorithm):
+    def __call__(self, task_tuple):
+
+        cov_param_idx = task_tuple[0]
+        rep = task_tuple[1]
+        algorithm = task_tuple[2]
 
         n_features = self.n_features
         n_samples = self.n_samples
@@ -77,11 +85,14 @@ class Worker(object):
             mcp.fit(X, y)
             beta_hat = mcp.coef_        
 
-        self.beta.extend(beta_)
-        self.beta_hat.extend(beta_hat)
+        self.beta.append(beta_)
+        self.beta_hat.append(beta_hat)
         self.task_signature.append((cov_param_idx, rep, algorithm))
-
+        print('call successful, algorithm %d took %f seconds' % (algorithm, time.time() - t0))
 if __name__ == '__main__':
+
+    n_features = 100
+    n_samples = 400
 
     # Block sizes
     block_sizes = [5, 10, 20]
@@ -97,9 +108,6 @@ if __name__ == '__main__':
     cov_params = [{'correlation' : t[0], 'block_size' : t[1], 'L' : t[2], 't': t[3]} for t in cov_list]
 
     nreps = 10
-    n_features = 100
-    n_samples = 400
-
     # Divide up the tasks
     comm = MPI.COMM_WORLD
     rank = comm.rank
@@ -113,7 +121,7 @@ if __name__ == '__main__':
     # 2: SCAD
     # 3: MCP
 
-    tasks = itertools.product(np.arange(len(cov_params)), np.arange(nreps), (0, 1, 2, 3))
+    tasks = itertools.product(np.arange(len(cov_params)), np.arange(nreps), [0, 1, 2, 3])
     worker = Worker(n_features=n_features, n_samples=n_samples, cov_params=cov_params)
     pool.map(worker, tasks)
 
