@@ -28,12 +28,12 @@ cov_list, _ = get_cov_list(n_features, 60, correlation, block_sizes, L, n_supple
 
 cov_params = [{'correlation' : t[0], 'block_size' : t[1], 'L' : t[2], 't': t[3]} for t in cov_list]
 
+cov_params = cov_params[::4]
+
 sparsity = np.array([0.25])
 
 iter_params = {
-
-'cov_params' : cov_params
-
+    'cov_params' : cov_params,
 }
 
 #############################################################
@@ -48,7 +48,7 @@ betaseed = 1234
 # blocks as a seed for the shuffling that is done, so that for a fixed
 # sparsity and block size, all beta vectors should be identical
 
-betawidth = [-1]
+betawidth = [-1, np.inf]
 
 beta_dict = []
 for i, bw in enumerate(betawidth):
@@ -63,14 +63,16 @@ comm_params = {
 # n/p ratio #
 'np_ratio': [4],
 'est_score' : 'BIC',
-'reps' : 5,
-'stability_selection' : [1],
+'reps' : 20,
+'stability_selection' : [0.75],
 'n_boots_sel': 25,
-'n_boots_est' : [5, 10, 15, 20, 25],
+'n_boots_est' : [5, 10, 25],
 'betadict' : beta_dict,
 # Inverse Signal to noise ratio
 'kappa' : [5],
-'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio', 'n_boots_est']
+'estimation_frac' : 0.9,
+'estimation_method': 'l2',
+'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio', 'n_boots_est'],
 }
 
 # Parameters for ElasticNet
@@ -85,11 +87,11 @@ comm_params['gamma'] = [3]
 # Which selection methods should we apply to the algorithms?
 comm_params['selection_methods'] = ['BIC', 'AIC', 'CV', 'gMDL', 'empirical_bayes', 'oracle']
 # Which fields should we record for each selection method? 
-comm_params['fields'] = {'BIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'], 
-						 'AIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'], 
-						 'CV' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'],
-                         'gMDL' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'],
-                         'empirical_bayes' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'
+comm_params['fields'] = {'BIC' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'], 
+						 'AIC' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'], 
+						 'CV' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'],
+                         'gMDL' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'],
+                         'empirical_bayes' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'
                                               ], 
-                         'oracle' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias']}
+                         'oracle' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias']}
 

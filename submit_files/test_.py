@@ -8,32 +8,35 @@ script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
 
 ###### Master list of parameters to be iterated over #######
 
-exp_types =  ['UoILasso']
+exp_types =  ['UoILasso',  'EN', 'CV_Lasso', 'scad', 'mcp']
 
 # Estimated worst case run-time for a single repitition for each algorithm in exp_types 
-algorithm_times = ['2:00:00', '00:30:00', '00:30:00']
+algorithm_times = ['12:00:00',  '04:00:00', '02:00:00', '02:00:00', '02:00:00']
 
-n_features = 100
+n_features = 500
 
 # Block sizes
-block_sizes = [5, 10, 20]
+block_sizes = [25, 50, 100]
 
 # Block correlation
 correlation = [0, 0.08891397, 0.15811388, 0.28117066, 0.5]
 
 # Exponential length scales
-L = [2, 5, 10, 20]
+L = [10, 25, 50, 100]
 
 cov_list, _ = get_cov_list(n_features, 60, correlation, block_sizes, L, n_supplement = 20)
 
 cov_params = [{'correlation' : t[0], 'block_size' : t[1], 'L' : t[2], 't': t[3]} for t in cov_list]
 
-cov_params = cov_params[::4]
-
-sparsity = np.array([0.25, 0.5])
+sparsity = np.logspace(np.log10(0.02), 0, 15)
 
 iter_params = {
-    'cov_params' : cov_params,
+
+'cov_params' : cov_params[:5],
+
+# Sparsity
+'sparsity' : np.array_split(sparsity, 5)
+
 }
 
 #############################################################
@@ -48,7 +51,7 @@ betaseed = 1234
 # blocks as a seed for the shuffling that is done, so that for a fixed
 # sparsity and block size, all beta vectors should be identical
 
-betawidth = [-1, np.inf]
+betawidth = [0.1, np.inf, -1]
 
 beta_dict = []
 for i, bw in enumerate(betawidth):
@@ -57,21 +60,19 @@ for i, bw in enumerate(betawidth):
 
 ##### Common parameters held fixed across all jobs ##########
 comm_params = {
-'sparsity': sparsity,
 'cov_type' : 'interpolation',
 'n_features' : n_features,
 # n/p ratio #
-'np_ratio': [4],
+'np_ratio': [2],
 'est_score' : 'BIC',
-'reps' : 20,
+'reps' : 1,
 'stability_selection' : [0.75],
 'n_boots_sel': 25,
-'n_boots_est' : [5, 10, 25, 50, 100],
+'n_boots_est' : 25,
 'betadict' : beta_dict,
 # Inverse Signal to noise ratio
 'kappa' : [5],
-'estimation_frac' : np.linspace(0.5, 0.9, 4),
-'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio', 'n_boots_est', 'estimation_frac'],
+'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio']
 }
 
 # Parameters for ElasticNet
@@ -86,11 +87,11 @@ comm_params['gamma'] = [3]
 # Which selection methods should we apply to the algorithms?
 comm_params['selection_methods'] = ['BIC', 'AIC', 'CV', 'gMDL', 'empirical_bayes', 'oracle']
 # Which fields should we record for each selection method? 
-comm_params['fields'] = {'BIC' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'], 
-						 'AIC' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'], 
-						 'CV' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'],
-                         'gMDL' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'],
-                         'empirical_bayes' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias'
+comm_params['fields'] = {'BIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
+						 'AIC' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
+						 'CV' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
+                         'gMDL' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
+                         'empirical_bayes' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 
                                               ], 
-                         'oracle' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 'bias']}
+                         'oracle' : ['beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param']}
 

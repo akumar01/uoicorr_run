@@ -8,10 +8,10 @@ script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
 
 ###### Master list of parameters to be iterated over #######
 
-exp_types =  ['UoILasso']
+exp_types =  ['CV_Lasso', 'scad', 'mcp']
 
 # Estimated worst case run-time for a single repitition for each algorithm in exp_types 
-algorithm_times = ['2:00:00', '00:30:00', '00:30:00']
+algorithm_times = ['0:30:00', '00:30:00', '00:30:00']
 
 n_features = 100
 
@@ -71,7 +71,7 @@ comm_params = {
 # Inverse Signal to noise ratio
 'kappa' : [5],
 'estimation_frac' : np.linspace(0.5, 0.9, 4),
-'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio', 'n_boots_est', 'estimation_frac'],
+'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio'],
 }
 
 # Parameters for ElasticNet

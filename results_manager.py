@@ -21,7 +21,10 @@ def calc_result(X, X_test, y, y_test, beta, field, exp_results):
     beta = beta.ravel()
     beta_hat = exp_results['coefs'].ravel()
 
-    if field == 'beta_hats':
+    if field == 'beta': 
+        result = beta
+
+    elif field == 'beta_hats':
 
         result = beta_hat
 

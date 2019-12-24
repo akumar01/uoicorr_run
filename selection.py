@@ -183,14 +183,12 @@ class UoISelector(Selector):
 
         # UoI Estimates have shape (n_boots_est, n_supports, n_coef)
         solutions = self.uoi.estimates_
-        intercepts = self.uoi.intercepts_
         boots = self.uoi.boots
 
         if self.comm is not None: 
             boots = self.comm.bcast(boots)
             solutions = self.comm.bcast(solutions)
-            intercepts = self.comm.bcast(intercepts)
-
+        
         n_boots, n_supports, n_coefs = solutions.shape
         # Distribute bootstraps across ranks
         tasks = np.arange(n_boots)
@@ -202,8 +200,8 @@ class UoISelector(Selector):
             # Test data
             xx = X[boots[1][boot], :]
             yy = y[boots[1][boot]]  
-            y_pred = solutions[boot, ...] @ xx.T + intercepts[boot, :][:, np.newaxis]
-
+            
+            y_pred = solutions[boot, ...] @ xx.T
             scores[i, :] = np.array([r2_score(yy, y_pred[j, :]) for j in range(n_supports)])
 
         # Gather 
@@ -228,7 +226,6 @@ class UoISelector(Selector):
     def selector(self, X, y):
 
         solutions = self.uoi.estimates_
-        intercepts = self.uoi.intercepts_
         boots = self.uoi.boots
         n_boots, n_supports, n_coefs = solutions.shape
 
@@ -236,8 +233,7 @@ class UoISelector(Selector):
         if self.comm is not None:
             boots = self.comm.bcast(boots)
             solutions = self.comm.bcast(solutions)
-            intercepts = self.comm.bcast(intercepts)
-
+        
         n_boots, n_supports, n_coefs = solutions.shape
 
         # Distribute bootstraps across ranks
@@ -256,7 +252,7 @@ class UoISelector(Selector):
             xx = X[boots[0][boot], :]
             yy = y[boots[0][boot]]
             n_samples, n_features = xx.shape
-            y_pred = solutions[boot, ...] @ xx.T + intercepts[boot, :][:, np.newaxis]
+            y_pred = solutions[boot, ...] @ xx.T
             
             sdict_ = super(UoISelector, self).selector(xx, yy, y_pred, solutions[boot, ...], 
                                                            np.arange(n_supports)) 
@@ -283,15 +279,12 @@ class UoISelector(Selector):
         # Simply return the maximum selection accuracy available
 
         solutions = self.uoi.estimates_
-        intercepts = self.uoi.intercepts_
-        assert(np.all(intercepts == 0))
         boots = self.uoi.boots
     
         if self.comm is not None:
             boots = self.comm.bcast(boots)
             solutions = self.comm.bcast(solutions)
-            intercepts = self.comm.bcast(intercepts)
-
+        
         n_boots, n_supports, n_coefs = solutions.shape
 
         # Distribute bootstraps across ranks
@@ -329,7 +322,6 @@ class UoISelector(Selector):
     def aBIC_selector(self, X, y, true_model):
 
         solutions = self.uoi.estimates_
-        intercepts = self.uoi.intercepts_
         assert(np.all(intercepts == 0))
         boots = self.uoi.boots
 

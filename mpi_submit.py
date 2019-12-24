@@ -206,7 +206,7 @@ def main(args):
             t1 = time.time()
             rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
             #print('Checkpoint 4: %f' % (time.time() - start))
-            print('Process group %d completed outer loop %d/%d' % (subrank, i, num_tasks))
+            print('Process group %d completed outer loop %d/%d' % (color, i + 1, num_tasks))
             print(time.time() - start)
 
         del params
@@ -221,8 +221,9 @@ def main(args):
 
     if rank == 0:
         # concatenate and clean up results
-        rmanager.concatenate()
+        # rmanager.concatenate()
         # rmanager.cleanup()
+        pass        
 
     print('Total time: %f' % (time.time() - total_start))
     print('Job completed!')

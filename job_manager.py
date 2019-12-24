@@ -253,14 +253,17 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
 
 def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
 
-    total_tasks = len(sbatch_array)
-    n_chunks = np.ceil(total_tasks/n_nodes).astype(int)
-    # Distribute elements of sbatch_array across nodes
-
-    chunked_sbatch_array = np.array_split(sbatch_array, n_chunks)
+    total_files = len(sbatch_array)
+    
+    # If the number of files exceeds then number of nodes we are willing to request 
+    # in one go, then we generate multiple sbatch files, otherwise not
+    chunked_sbatch_array = np.array_split(sbatch_array, np.ceil(total_files/n_nodes).astype(int))
 
     for i1, chunk in enumerate(chunked_sbatch_array):
 
+        # Each param file has access to this many nodes
+        nodes_per_file = max(1, np.floor(n_nodes/total_files).astype(int))
+ 
         # We will take the metadata from the first element in the
         # sbatch array chunk
         qos = chunk[0]['qos']
@@ -273,6 +276,12 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
         sbname = '%s/%s' % (sbatch_dir, sbname)
         script = 'mpi_submit.py'
 
+        # Open up the param file and get the index_length
+        param_file = Indexed_Pickle(chunk[0]['arg_file'])
+        param_file.init_read()
+        
+        total_tasks = len(param_file.index)
+        param_file.close_read()  
         with open(sbname, 'w') as sb:
 
             if 'jobname' not in list(chunk[0].keys()):
@@ -304,8 +313,17 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
 
                 # results files need to be handled separately for each line
                 results_dir = '%s/%s_%d' % (sbatch_dir, jobname, i2)
-                sb.write('srun -N 1 -n 50 -c 4 python3 -u %s/%s %s %s %s &\n' % \
-                         (script_dir, script, task['arg_file'], results_dir, task['exp_type']))
+                # Allocate 50 threads for parallelizing UoI itself, use this to determine comm_splits 
+                if task['exp_type'] == 'UoILasso':
+                    comm_splits = np.floor(68 * nodes_per_file/50).astype(int)
+                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s --comm_splits=%d &\n' % \
+                            (nodes_per_file, 68 * nodes_per_file,
+                            script_dir, script, task['arg_file'], results_dir, task['exp_type'],
+                            comm_splits))
+                else:
+                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s &\n' % \
+                            (nodes_per_file, 68 * nodes_per_file,
+                            script_dir, script, task['arg_file'], results_dir, task['exp_type']))
 
             sb.write('wait')
 
@@ -535,7 +553,7 @@ def run_(run_file):
 
 # Rework run jobs local to output a shell script that is sequentially executed
 def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = None,
-                   script_path=None, exec_str = 'srun'):
+                   script_path=None, exec_str = 'srun', background=False):
 
     mpi_strings = []
 
@@ -562,10 +580,13 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
             # Delete superflous indices        
             for index in sorted(del_indices, reverse=True):
                 del mpi_string[index]
-
+    
             # Replace script and data dirs with local machine paths
             if script_path is not None:
                 mpi_string[5] = script_path
+
+            # Replace the number of MPI tasks with the number of requested procs. 
+            mpi_string[2] = '%d' % nprocs
 
             mpi_strings.append(mpi_string)
 
@@ -574,8 +595,12 @@ def run_jobs_local(jobdir, nprocs, run_files = None, size = None, exp_type = Non
     with open('run_jobs_local_temp.sh', 'w') as f:
         f.write('#!/bin/bash\n')
         for mpi_string in mpi_strings:
-            f.write(' '.join(mpi_string) + '\n')
-
+            if background:
+                f.write(' '.join(mpi_string) + '&\n')
+            else:
+                f.write(' '.join(mpi_string) + '\n')
+        if background:
+            f.write('wait')
     # Change permission
     os.chmod('run_jobs_local_temp.sh', 0o777)
 

@@ -28,12 +28,9 @@ cov_list, _ = get_cov_list(n_features, 60, correlation, block_sizes, L, n_supple
 
 cov_params = [{'correlation' : t[0], 'block_size' : t[1], 'L' : t[2], 't': t[3]} for t in cov_list]
 
-sparsity = np.array([0.25])
+sparsity = np.array([0.25, 0.5])
 
 iter_params = {
-
-'cov_params' : cov_params
-
 }
 
 #############################################################
@@ -57,20 +54,21 @@ for i, bw in enumerate(betawidth):
 
 ##### Common parameters held fixed across all jobs ##########
 comm_params = {
+'cov_params' : cov_params,
 'sparsity': sparsity,
 'cov_type' : 'interpolation',
 'n_features' : n_features,
 # n/p ratio #
 'np_ratio': [4],
 'est_score' : 'BIC',
-'reps' : 5,
+'reps' : 20,
 'stability_selection' : [0.75],
 'n_boots_sel': 25,
 'n_boots_est' : 25,
 'betadict' : beta_dict,
 # Inverse Signal to noise ratio
 'kappa' : [5],
-'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio']
+'sub_iter_params': ['betadict', 'sparsity', 'kappa', 'np_ratio', 'cov_params']
 }
 
 # Parameters for ElasticNet
