@@ -4,7 +4,7 @@ import itertools
 import time
 
 from sklearn.linear_model.coordinate_descent import _alpha_grid
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import ElasticNet, ElasticNetCV
 
 from pyuoi.linear_model import UoI_Lasso
 from pyuoi.linear_model import UoI_ElasticNet
@@ -14,6 +14,8 @@ from pyc_based.pycasso_cv import PycassoCV, PycassoGrid, PycEnCV
 
 from r_based.slope import SLOPE as SLOPE_
 from r_based.slope import SLOPE_CV
+
+from sklbased import EN_Grid
 
 from selection import Selector, UoISelector
 
@@ -78,14 +80,12 @@ class CV_Lasso(StandardLM_experiment):
                                     self.alphas, X, y, true_model)
             self.results[selection_method] = sdict
         print('Selection Method: %s, Time: %f' % (selection_method, time.time() - t0))
+
 class EN(StandardLM_experiment):
 
     @classmethod
     def run(self, X, y, args, selection_methods = ['CV']):
-
-        # Run RidgeCV to determine L2 penalty
-        rdge = RidgeCV(alphas = np.linspace(1e-5, 100, 500)).fit(X, y)
-        self.l2 = rdge.alpha_
+        self.l1_ratios = args['l1_ratios']
         results = super(EN, self).run(X, y, args, selection_methods)
         return results
 
@@ -97,26 +97,21 @@ class EN(StandardLM_experiment):
         # For cross validation, use our solution that uses pycasso
         if selection_method == 'CV': 
             print('Fitting!')
-            en = PycEnCV(n_folds = self.cv_splits, fit_intercept=False, 
-                         lambda1=self.alphas, lambda2=self.l2)
+            en = ElasticNetCV(fit_intercept=False, cv=5, n_alphas=25, l1_ratio=self.l1_ratios)
             en.fit(X, y.ravel())
-            # en = ElasticNetCV(cv = self.cv_splits, l1_ratio = self.l1_ratio, 
-            #                 n_alphas = self.n_alphas).fit(X, y.ravel())
+
             self.results[selection_method]['coefs'] = en.coef_
-            self.results[selection_method]['reg_param'] = [en.lambda1_, en.lambda2_]
+            self.results[selection_method]['reg_param'] = [en.alpha_, en.l1_ratio_]
         else:
 
             if not hasattr(self, 'fitted_estimator'):
                 print('Fitting!')
 
-                en = PycassoElasticNet(fit_intercept = False, 
-                                       lambda1=self.alphas, lambda2=self.l2)
-
+                en = EN_Grid(l1_ratios=self.l1_ratios, l1_params=self.alphas)
                 en.fit(X, y)
                 estimates = en.coef_
-
                 reg_params = np.zeros((self.alphas.size, 2))
-                reg_params[:, 0] = self.l2
+                reg_params[:, 0] = self.l1_ratios
                 reg_params[:, 1] = self.alphas
                 self.fitted_estimator = en
             selector = Selector(selection_method)
