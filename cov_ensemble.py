@@ -103,64 +103,71 @@ if __name__ == '__main__':
     # Do not include fully dense model
     sparsity = np.logspace(np.log10(0.02), 0, 15)[:-1]
 
+    # Chunk across cov params and nreps
+    task_indices = itertools.product(np.arange(len(cov_params)), np.arange(n), np.arange(nreps))
+
     # Chunk the cov params
-    cov_params_chunk = np.array_split(cov_params, comm.size)
+    task_chunk = np.array_split(list(task_indices), comm.size)
 
-    rho = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps))
-    eta = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps, sparsity.size, nreps2))        
-    eta2 = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps, sparsity.size))
-    norm_diff = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps))
+    rho = np.zeros(len(task_chunk[comm.rank]))
+    eta = np.zeros((len(task_chunk[comm.rank]), sparsity.size, nreps2))        
+    eta2 = np.zeros((len(task_chunk[comm.rank]), sparsity.size))
+    norm_diff = np.zeros((len(task_chunk[comm.rank])))
 
-    print(len(cov_params_chunk[comm.rank]))
+    print(len(task_chunk[comm.rank]))
 
-    for i1, cov_param in enumerate(cov_params_chunk[comm.rank]):
+    for i, task_idx in enumerate(task_chunk[comm.rank]):
+
         print('Rank %d starting task %d' % (comm.rank, i1))
+        t0 = time.time()  
+
+        cidx, nidx, rep = task_idx
+
+        cov_param = cov_params[cidx]
+        n_ = n[nidx]
+
         # Generate Wishart matrices seeded by this particular sigma 
         sigma = gen_covariance(p, **cov_param)
-        for nidx, n_ in enumerate(n):         
-            # t0 = time.time()
        
-            for rep in range(nreps):
-                t0 = time.time()  
-                # Seed to be able to reconstruct the matrix later
-                random_state = RandomState(rep)
-                sigma_rep = wishart.rvs(df=n_, scale=sigma, random_state=random_state)
-                # Normalize the matrix 
-                D = np.diag(np.sqrt(np.diag(sigma_rep)))
-                sigma_rep = np.linalg.inv(D) @ sigma_rep @ np.linalg.inv(D)            
-                # sigma_rep = sigma
-                norm_diff[i1, nidx, rep] = np.linalg.norm(sigma_rep - sigma, 'fro')            
-                try:
-                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep), 1, which='LM', return_eigenvectors=False, maxiter=10000)
-                except:
-                    rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep), 1, which='LM', return_eigenvectors=False, maxiter=10000, tol=1e-2)
-                for i3, s in enumerate(sparsity):
+        # Seed to be able to reconstruct the matrix later
+        random_state = RandomState(rep)
+        sigma_rep = wishart.rvs(df=n_, scale=sigma, random_state=random_state)
+        # Normalize the matrix 
+        D = np.diag(np.sqrt(np.diag(sigma_rep)))
+        sigma_rep = np.linalg.inv(D) @ sigma_rep @ np.linalg.inv(D)            
+        # sigma_rep = sigma
+        norm_diff[i1, nidx, rep] = np.linalg.norm(sigma_rep - sigma, 'fro')            
+        try:
+            rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep), 1, which='LM', return_eigenvectors=False, maxiter=10000)
+        except:
+            rho[i1, nidx, rep] = 1/eigsh(np.linalg.inv(sigma_rep), 1, which='LM', return_eigenvectors=False, maxiter=10000, tol=1e-2)
+        for i3, s in enumerate(sparsity):
 #                    t0 = time.time()
-                    # Keep the nonzero components of beta fixed for each sparsity
-                    # Here, we ensure that blocks are treated equally
-                
-                    subset = sparsify_beta(np.ones((p, 1), dtype=int), block_size=cov_param['block_size'], 
-                                       sparsity = s, seed = s).ravel()
-                    if len(np.nonzero(subset)[0]) == 0:
-                        eta[i1, nidx, rep, i3, :] = np.nan
-                        eta2[i1, nidx, rep, i3] = np.nan
-                        continue
-
-                    else:
-                        eta2[i1, nidx, rep, i3] = calc_irrep_const(sigma_rep, np.nonzero(subset)[0])               
-                        
-                        for rep2 in range(nreps2):         
-                
-                            X, _, _, _, _ = gen_data(2000, p, covariance = sigma_rep, beta=subset.ravel())
-                            # Normalize X
-                            X = StandardScaler().fit_transform(X)
-                            C = 1/n_ * X.T @ X
-                            eta[i1, nidx, rep, i3, rep2] = calc_irrep_const(C, np.nonzero(subset)[0])                            
-                    
-                if comm.rank == 0:    
-                    print(time.time() - t0)        
+            # Keep the nonzero components of beta fixed for each sparsity
+            # Here, we ensure that blocks are treated equally
         
-        print('%d/%d' % (i1 + 1, len(cov_params_chunk[comm.rank])))
+            subset = sparsify_beta(np.ones((p, 1), dtype=int), block_size=cov_param['block_size'], 
+                               sparsity = s, seed = s).ravel()
+            if len(np.nonzero(subset)[0]) == 0:
+                eta[i1, nidx, rep, i3, :] = np.nan
+                eta2[i1, nidx, rep, i3] = np.nan
+                continue
+
+            else:
+                eta2[i1, nidx, rep, i3] = calc_irrep_const(sigma_rep, np.nonzero(subset)[0])               
+                
+                for rep2 in range(nreps2):         
+        
+                    X, _, _, _, _ = gen_data(2000, p, covariance = sigma_rep, beta=subset.ravel())
+                    # Normalize X
+                    X = StandardScaler().fit_transform(X)
+                    C = 1/n_ * X.T @ X
+                    eta[i1, nidx, rep, i3, rep2] = calc_irrep_const(C, np.nonzero(subset)[0])                            
+            
+        if comm.rank == 0:    
+            print(time.time() - t0)        
+        
+        print('%d/%d' % (i1 + 1, len(task_chunk[comm.rank])))
     
 
     # Gather and save results
@@ -168,7 +175,6 @@ if __name__ == '__main__':
     eta = Gatherv_rows(eta, comm, root = 0)
     eta2 = Gatherv_rows(eta2, comm, root = 0)
     norm_diff = Gatherv_rows(norm_diff, comm, root = 0)
-
 
     if comm.rank == 0:
         with open('cov_ensemble.dat', 'wb') as f:
