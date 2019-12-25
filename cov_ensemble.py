@@ -111,6 +111,8 @@ if __name__ == '__main__':
     eta2 = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps, sparsity.size))
     norm_diff = np.zeros((len(cov_params_chunk[comm.rank]), len(n), nreps))
 
+    print(len(cov_params_chunk[comm.rank]))
+
     for i1, cov_param in enumerate(cov_params_chunk[comm.rank]):
         print('Rank %d starting task %d' % (comm.rank, i1))
         # Generate Wishart matrices seeded by this particular sigma
