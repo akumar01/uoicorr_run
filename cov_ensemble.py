@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     for i1, cov_param in enumerate(cov_params_chunk[comm.rank]):
         print('Rank %d starting task %d' % (comm.rank, i1))
-        # Generate Wishart matrices seeded by this particular sigma
+        # Generate Wishart matrices seeded by this particular sigma 
         sigma = gen_covariance(p, **cov_param)
         for nidx, n_ in enumerate(n):         
             # t0 = time.time()
@@ -126,7 +126,7 @@ if __name__ == '__main__':
                 random_state = RandomState(rep)
                 sigma_rep = wishart.rvs(df=n_, scale=sigma, random_state=random_state)
                 # Normalize the matrix 
-                D = np.sqrt(np.diag(np.diag(sigma_rep)))
+                D = np.diag(np.sqrt(np.diag(sigma_rep)))
                 sigma_rep = np.linalg.inv(D) @ sigma_rep @ np.linalg.inv(D)            
                 # sigma_rep = sigma
                 norm_diff[i1, nidx, rep] = np.linalg.norm(sigma_rep - sigma, 'fro')            
