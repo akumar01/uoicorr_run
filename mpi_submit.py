@@ -17,7 +17,8 @@ from mpi_utils.ndarray import Bcast_from_root, Gatherv_rows, Gather_ndlist
 from job_utils.results import  ResultsManager
 from job_utils.idxpckl import Indexed_Pickle
 
-from utils import gen_covariance, sparsify_beta, gen_data
+from utils import sparsify_beta, gen_data
+from expanded_ensemble import load_covariance
 from results_manager import init_results_container, calc_result
 
 def manage_comm():
@@ -62,18 +63,12 @@ def gen_data_(params, subcomm, subrank):
     seed = params['seed']
 
     if subrank == 0:
-        # Generate covariance
-        sigma = gen_covariance(params['n_features'],
-                               params['cov_params']['correlation'],
-                               params['cov_params']['block_size'],
-                               params['cov_params']['L'],
-                               params['cov_params']['t'])
-
+        # Generate covariance according to index
+        sigma, cov_params = gen_covariance(params['cov_idx'])
 
         # Sparsify the beta - seed with the block size
-        beta = sparsify_beta(params['betadict']['beta'], params['cov_params']['block_size'],
-                             params['sparsity'], seed=params['cov_params']['block_size'])
-
+        beta = sparsify_beta(params['betadict']['beta'], cov_params['block_size'],
+                             params['sparsity'], seed=cov_params['block_size'])
     else:
 
         sigma = None

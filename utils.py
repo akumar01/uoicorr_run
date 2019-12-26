@@ -408,7 +408,6 @@ def gen_avg_covariance(cov_type, avg_cov = 0.1, n_features = 60, **kwargs):
 
 # Return covariance matrix given the necessary parameters
 
-# random : If non-negative, generate matrix from the expanded ensemble
 def gen_covariance(n_features, correlation, block_size, L, t, variance = 1):
 
     s0 = block_covariance(n_features, correlation, block_size)
