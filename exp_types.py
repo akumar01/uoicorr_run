@@ -15,7 +15,7 @@ from pyc_based.pycasso_cv import PycassoCV, PycassoGrid, PycEnCV
 from r_based.slope import SLOPE as SLOPE_
 from r_based.slope import SLOPE_CV
 
-from sklbased import EN_Grid
+# from sklbased import EN_Grid
 
 from selection import Selector, UoISelector
 
@@ -166,8 +166,8 @@ class UoILasso():
                 n_lambdas = self.n_alphas,
                 comm = comm, 
                 solver = 'cd',
-                estimation_frac= args['estimation_frac'],
-                estimation_method= args['estimation_method']
+                estimation_frac=0.9,
+                estimation_method='ols'
                 )
             if rank == 0:
                 print('Fitting!')

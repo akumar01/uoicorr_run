@@ -1,4 +1,5 @@
 import pdb
+import os
 import numpy as np 
 from numpy.random import RandomState
 from scipy.stats import wishart
@@ -11,7 +12,7 @@ def load_covariance(index):
     p = 500
     
     # Load the orignal set of covariance parameters
-    with open('unique_cov_param.dat', 'rb') as f:
+    with open('%s/repos/uoicorr_run/unique_cov_param.dat' % os.environ['HOME'], 'rb') as f:
         cov_params = pickle.load(f)
 
     if index < 80:
@@ -20,7 +21,7 @@ def load_covariance(index):
     else:
 
         # Load the indicies that constrain the random perturbations
-        with open('ensemble_expansion_indices', 'rb') as f:
+        with open('%s/repos/uoicorr_run/ensemble_expansion_indices.dat' % os.environ['HOME'], 'rb') as f:
             expansion_idxs = pickle.load(f)
 
         index = index - 80

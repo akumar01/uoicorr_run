@@ -64,7 +64,7 @@ def gen_data_(params, subcomm, subrank):
 
     if subrank == 0:
         # Generate covariance according to index
-        sigma, cov_params = gen_covariance(params['cov_idx'])
+        sigma, cov_params = load_covariance(params['cov_idx'])
 
         # Sparsify the beta - seed with the block size
         beta = sparsify_beta(params['betadict']['beta'], cov_params['block_size'],

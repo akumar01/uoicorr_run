@@ -20,20 +20,30 @@ import natsort
 from utils import gen_covariance, gen_beta2, gen_data
 from misc import group_dictionaries, unique_obj
 
+from expanded_ensemble import load_covariance
 
 from job_utils.idxpckl import Indexed_Pickle
 from job_utils.results import ResultsManager
 
 # Go through the iter param list and strip away any entries that do not
 # pass validations.
-def validate_params(iter_param_list):
+def validate_params(iter_param_list, cov_params, expansion_idxs):
 
     bad_idxs = []
 
     for i, param in enumerate(iter_param_list):
         # Make sure that betas are not all zero
+    
+        # Need to get the block size under the new system
+        if param['cov_idx'] < 80:
+            cov_param = cov_params[param['cov_idx']]
+        else: 
+            cidx, _, _ = np.unravel_index(int(expansion_idxs[param['cov_idx'] - 80]), 
+                                         (80, 10, 20))       
+            cov_param = cov_params[cidx]
+
         n_nonzero_beta = int(param['sparsity'] * \
-                             param['cov_params']['block_size'])
+                             cov_param['block_size'])
         if n_nonzero_beta == 0:
             bad_idxs.append(i)
 
@@ -102,6 +112,12 @@ def fix_datatypes(obj):
 
 def generate_arg_files(argfile_array, jobdir):
 
+    # Load these files for some validation
+    with open('unique_cov_param.dat', 'rb') as f:
+        cov_params = pickle.load(f)
+    with open('ensemble_expansion_idxs.dat', 'rb') as f:
+        eei = pickle.load(f)
+
     paths = []
     ntasks = []
     # Keep track of seeds so that they are not repeated
@@ -149,7 +165,7 @@ def generate_arg_files(argfile_array, jobdir):
                 param_comb['n_samples'] = n_samples
 
         # trim away parameter combinations that do not pass validation (i.e. all betas end up being 0)
-        iter_param_list = validate_params(iter_param_list)
+        iter_param_list = validate_params(iter_param_list, cov_params, eei)
 
         # Make n_reps independent copies of iter_param_list
         iter_param_list = [deepcopy(iter_param_list) for _ in range(arg_['reps'])]
@@ -315,7 +331,8 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
                 results_dir = '%s/%s_%d' % (sbatch_dir, jobname, i2)
                 # Allocate 50 threads for parallelizing UoI itself, use this to determine comm_splits 
                 if task['exp_type'] == 'UoILasso':
-                    comm_splits = np.floor(68 * nodes_per_file/50).astype(int)
+                    # comm_splits = np.floor(68 * nodes_per_file/25).astype(int)
+                    comm_splits = 4
                     sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s --comm_splits=%d &\n' % \
                             (nodes_per_file, 68 * nodes_per_file,
                             script_dir, script, task['arg_file'], results_dir, task['exp_type'],
