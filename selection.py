@@ -27,7 +27,8 @@ class Selector():
         # the provided selection method string
 
         if self.selection_method in ['mBIC', 'eBIC', 'BIC', 'AIC',
-                                       'gMDL', 'empirical_bayes']:
+                                     'BIC_ols', 'AIC_ols',
+                                     'gMDL', 'empirical_bayes']:
             sdict = self.selector(X, y, y_pred, solutions, 
                                   reg_params)
         elif self.selection_method == 'oracle':
@@ -55,7 +56,7 @@ class Selector():
                                np.count_nonzero(solutions[i, :]),
                                penalty) for i in range(solutions.shape[0])])
             sidx = np.argmin(scores)
-        if self.selection_method == 'mBIC':
+        elif self.selection_method == 'mBIC':
             scores = mBIC(X, y, solutions)
             sidx = np.argmax(scores)
         elif self.selection_method ==  'eBIC':
@@ -64,7 +65,7 @@ class Selector():
                                     for i in range(solutions.shape[0])])
             sidx = np.argmin(scores)
 
-        elif self.selection_method in ['gMDL', 'empirical_bayes']:
+        else:
 
             # Fit OLS models
             OLS_solutions = np.zeros(solutions.shape)
@@ -78,7 +79,19 @@ class Selector():
 
             y_pred = OLS_solutions @ X.T
 
-            if self.selection_method == 'gMDL':
+            # AIC/BIC using OLS solutions
+            if self.selection_method in ['AIC_ols', 'BIC_ols']:
+                if self.selection_method == 'BIC_ols':
+                    penalty = np.log(n_samples)
+                if self.selection_method == 'AIC_ols':
+                    penalty = 2
+                
+                scores = np.array([GIC(y.ravel(), y_pred[i, :], 
+                                   np.count_nonzero(solutions[i, :]),
+                                   penalty) for i in range(solutions.shape[0])])
+                sidx = np.argmin(scores)
+
+            elif self.selection_method == 'gMDL':
                 scores = np.array([gMDL(y.ravel(), y_pred[i, :],
                             np.count_nonzero(solutions[i, :]))
                             for i in range(solutions.shape[0])])
