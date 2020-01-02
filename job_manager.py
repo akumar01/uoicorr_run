@@ -206,7 +206,7 @@ def generate_log_file(argfile_array, jobdir, desc = None):
     metadata.to_pickle('%s/log.dat' % jobdir)
 
 
-def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
+def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir, srun_flags=''):
 
     # Generate sbatch scripts for the given directory
 
@@ -263,9 +263,9 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir):
             # sb.write('sbcast -f --compress %s/%s /tmp/%s\n' % (script_dir, script, script))
 
             # sb.write('sbcast -f --compress %s/%s /tmp/%s\n' % (script_dir, script, script))
-            sb.write('srun python3 -u %s/%s %s %s %s'
+            sb.write('srun python3 -u %s/%s %s %s %s %s'
                      % (script_dir, script, sbatch['arg_file'],
-                     results_file, sbatch['exp_type']))
+                     results_file, sbatch['exp_type'], srun_flags))
 
 def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
 
@@ -352,7 +352,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
 # srun_opts: options to feed into the srun command (for example, n tasks, n cpus per task)
 def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
                          skip_argfiles = False, single_test = False, exp_types=None,
-                         n_nodes=100):
+                         n_nodes=100, srun_flags=''):
 
     if not os.path.exists(jobdir):
         os.makedirs(jobdir)
@@ -444,7 +444,7 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         # generate_sbatch_scripts(sbatch_array[i], '%s/%s' % (jobdir, exp_type),
         #                         script_dir)
         gen_sbatch_multinode(sbatch_array[i], '%s/%s' % (jobdir, exp_type),
-                             script_dir, n_nodes)
+                             script_dir, n_nodes, srun_flags)
 
 
 def regen_sbatch_scripts(jobdir, script_dir, run_files, sbatch_dict):
