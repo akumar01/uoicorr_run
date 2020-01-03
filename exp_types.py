@@ -57,7 +57,10 @@ class CV_Lasso(StandardLM_experiment):
         t0 = time.time()
         # Use the pycassocv for Lasso
         if selection_method == 'CV': 
-            print('Fitting!')
+            try:
+                logging.debug('Fitting!')
+            else:
+                print('Fitting')
             lasso = PycassoCV(penalty='l1', n_alphas=48, 
                               gamma=3, alphas=self.alphas)
             lasso.fit(X, y.ravel())
@@ -69,7 +72,10 @@ class CV_Lasso(StandardLM_experiment):
         else: 
             if not hasattr(self, 'fitted_estimator'):
                 # If not yet fitted, run the pycasso lasso
-                print('Fitting!')
+                try:
+                    logging.debug('Fitting!')
+                else:
+                    print('Fitting')
                 lasso = PycassoLasso(alphas = self.alphas)
                 lasso.fit(X, y)
                 self.fitted_estimator = lasso
@@ -79,7 +85,11 @@ class CV_Lasso(StandardLM_experiment):
             sdict = selector.select(self.fitted_estimator.coef_, 
                                     self.alphas, X, y, true_model)
             self.results[selection_method] = sdict
-        print('Selection Method: %s, Time: %f' % (selection_method, time.time() - t0))
+        try:
+            logging.debug('Selection Method: %s, Time: %f' % (selection_method, time.time() - t0))
+        except:
+            print('Selection Method: %s, Time: %f' % (selection_method, time.time() - t0))
+
 
 class EN(StandardLM_experiment):
 
@@ -96,7 +106,10 @@ class EN(StandardLM_experiment):
 
         # For cross validation, use our solution that uses pycasso
         if selection_method == 'CV': 
-            print('Fitting!')
+            try:
+                logging.debug('Fitting!')
+            except:
+                print('Fitting!')
             en = ElasticNetCV(fit_intercept=False, cv=5, n_alphas=25, l1_ratio=self.l1_ratios)
             en.fit(X, y.ravel())
 
@@ -105,7 +118,10 @@ class EN(StandardLM_experiment):
         else:
 
             if not hasattr(self, 'fitted_estimator'):
-                print('Fitting!')
+                try:
+                    logging.debug('Fitting!')
+                except:
+                    print('Fitting!')
 
                 en = EN_Grid(l1_ratios=self.l1_ratios, l1_params=self.alphas)
                 en.fit(X, y)
@@ -153,8 +169,6 @@ class UoILasso():
                        X, y, selection_method):
 
         if not hasattr(self, 'fitted_estimator'):
-            print(args['n_boots_sel'])
-            print(args['n_boots_est']) 
             # If not yet fitted, run the pycasso lasso
             t0 = time.time()
             uoi = UoI_Lasso(
@@ -170,10 +184,17 @@ class UoILasso():
                 estimation_method='ols'
                 )
             if rank == 0:
-                print('Fitting!')
+                try:
+                    logging.debug('Fitting!')
+                except:
+                    print('Fitting!')
             uoi.fit(X, y.ravel())
             if rank == 0:
-                print('fit time: %f' % (time.time() - t0)) 
+                try:
+                    logging.debug('fit time: %f' % (time.time() - t0))
+                except:
+                    print('fit time: %f' % (time.time() - t0))
+
             self.fitted_estimator = uoi
 
         # Use the fact that UoI stores all of its estimates to
@@ -213,7 +234,7 @@ class UoIElasticNet(UoILasso):
                 estimation_score=args['est_score'],
                 stability_selection = args['stability_selection'],
                 n_lambdas = self.n_alphas,
-                comm = comm
+                    comm = comm
                 )
             
             print('Fitting!')
@@ -264,7 +285,10 @@ class PYC(StandardLM_experiment):
                 # If not yet fitted, run the pycasso lasso
                 estimator = PycassoGrid(penalty = penalty, n_alphas = self.n_alphas,
                                         fit_intercept = False, gamma = self.gamma)
-                print('Fitting!')
+                try:
+                    logging.debug('Fitting!')
+                except:
+                    print('Fitting!')
                 estimator.fit(X, y)
                 self.fitted_estimator = estimator
 
