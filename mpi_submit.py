@@ -135,7 +135,10 @@ def main(args):
 
     # Load or initialize the Results Manager object
     if args.resume:
-        rmanager = ResultsManager.restore_from_directory(results_dir)
+        try:
+            rmanager = ResultsManager.restore_from_directory(results_dir)
+        except:
+            rmanager = ResultsManager(total_tasks = total_tasks, directory = results_dir)
     else:
         rmanager = ResultsManager(total_tasks = total_tasks, directory = results_dir)
 

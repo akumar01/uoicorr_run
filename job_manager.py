@@ -267,7 +267,7 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir, srun_flags='')
                      % (script_dir, script, sbatch['arg_file'],
                      results_file, sbatch['exp_type'], srun_flags))
 
-def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
+def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_flags=''):
 
     total_files = len(sbatch_array)
     
@@ -333,14 +333,15 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes):
                 if task['exp_type'] == 'UoILasso':
                     # comm_splits = np.floor(68 * nodes_per_file/25).astype(int)
                     comm_splits = 4
-                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s --comm_splits=%d &\n' % \
+                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
                             (nodes_per_file, 68 * nodes_per_file,
                             script_dir, script, task['arg_file'], results_dir, task['exp_type'],
-                            comm_splits))
+                            comm_splits, srun_flags))
                 else:
-                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s &\n' % \
+                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s %s &\n' % \
                             (nodes_per_file, 68 * nodes_per_file,
-                            script_dir, script, task['arg_file'], results_dir, task['exp_type']))
+                            script_dir, script, task['arg_file'], results_dir, task['exp_type'],
+                            srun_flags))
 
             sb.write('wait')
 
