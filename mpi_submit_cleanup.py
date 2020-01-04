@@ -32,13 +32,10 @@ from loguru import logger
 def mpi_main(task_tuple):
 
     # Unpack args
-    rmanager, arg_file, todo, color = task_tuple
-    
+    rmanager, arg_file, todo, dir_logger, color = task_tuple
     exp_type = args.exp_type
     results_dir = rmanager.directory
-
-    # Add a sink to the logger
-    logger.debug('Starting %s, %d tasks' % (arg_file, len(todo)))
+    dir_logger.debug('Starting %s, %d tasks' % (arg_file, len(todo)))
     # hard-code n_reg_params because why not
     if exp_type in ['EN', 'scad', 'mcp']:
         n_reg_params = 2
@@ -89,8 +86,8 @@ def mpi_main(task_tuple):
             t1 = time.time()
             rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
             #print('Checkpoint 4: %f' % (time.time() - start))
-            logger.debug('Process group %d completed outer loop %d/%d' % (color, i + 1, num_tasks))
-            logger.debug(time.time() - start)
+            dir_logger.debug('Process group %d completed outer loop %d/%d' % (color, i + 1, num_tasks))
+            dir_logger.debug(time.time() - start)
             print('Hi!')
         del params
 
@@ -99,8 +96,8 @@ def mpi_main(task_tuple):
 
     f.close_read()
 
-    logger.debug('Total time: %f' % (time.time() - total_start))
-    logger.debug('Job completed!')
+    dir_logger.debug('Total time: %f' % (time.time() - total_start))
+    dir_logger.debug('Job completed!')
 
 def arrange_tasks(dirs):
 
@@ -127,7 +124,13 @@ def arrange_tasks(dirs):
         # Take the difference between what has been done and what needs to be done
         todo = np.array(list(set(np.arange(total_tasks)).difference(set(rmanager.inserted_idxs()))))
 
-        task_list.append((rmanager, arg_file, todo))
+        # Add a sink to the logger
+        logfile = open('%s/log' % dir_, 'w')
+        # Create a wrapper for the base logger corresponding to this execution        
+        dir_logger = logger.bind(logid=argnumber) 
+        # Create a sink with a filter that matches the logid
+        dir_logger.add(logfile, filter=lambda record: record['logid'] == argnumber if 'logid' in list(record.keys()) else False)
+        task_list.append((rmanager, arg_file, todo, dir_logger))
 
     return task_list
 
