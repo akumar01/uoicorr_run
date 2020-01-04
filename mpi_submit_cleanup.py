@@ -22,7 +22,7 @@ from expanded_ensemble import load_covariance
 from results_manager import init_results_container, calc_result
 
 from schwimmbad import MPIPool
-import logger
+import logging
 
 # Reformat mpi_submit to take an entire directory of jobs that have been partially
 # completed and use schwimmbad to deal out fit responsibilities to each one
@@ -96,7 +96,7 @@ def mpi_main(task_tuple):
 
         del params
 
-        if args.test and i == args.ntest:logger
+        if args.test and i == args.ntest:
             break
 
     f.close_read()
@@ -252,7 +252,7 @@ if __name__ == '__main__':
         pool = MPIPool(root_comm)
 
         # requires our fork of schwimmbad
-        pool.map(mpi_main, task_list, args=(subcomm, color))
+        pool.map(mpi_main, task_list, fargs=(subcomm, color))
 
         if not pool.is_master():
             pool.wait()
