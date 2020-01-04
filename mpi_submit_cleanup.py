@@ -22,7 +22,7 @@ from expanded_ensemble import load_covariance
 from results_manager import init_results_container, calc_result
 
 from schwimmbad import MPIPool
-import logging
+from loguru import logger
 
 # Reformat mpi_submit to take an entire directory of jobs that have been partially
 # completed and use schwimmbad to deal out fit responsibilities to each one
@@ -32,11 +32,12 @@ import logging
 def mpi_main(task_tuple):
 
     # Unpack args
-    rmanager, arg_file, todo, subcomm, color = task_tuple
+    rmanager, arg_file, todo, color = task_tuple
+    
+    exp_type = args.exp_type
+    results_dir = rmanager.directory
 
-    # Grab the logger
-    logger = logging.getLogger('%d' % color)
-
+    # Add a sink to the logger
     logger.debug('Starting %s, %d tasks' % (arg_file, len(todo)))
     # hard-code n_reg_params because why not
     if exp_type in ['EN', 'scad', 'mcp']:
@@ -54,15 +55,12 @@ def mpi_main(task_tuple):
     selection_methods = f.header['selection_methods']
     fields = f.header['fields']
 
-    exp_type = args.exp_type
-    results_dir = rmanager.directory
-
     for i in range(num_tasks):
         start = time.time()
         params = f.read(todo[i])
-        params['comm'] = self.subcomm
+        params['comm'] = subcomm
         X, X_test, y, y_test, params = gen_data_(params, 
-                                                 self.subcomm, self.subrank)
+                                                 subcomm, subrank)
 
         # Hard-coded convenience for SCAD/MCP
         if exp_type in ['scad', 'mcp']:
@@ -93,7 +91,7 @@ def mpi_main(task_tuple):
             #print('Checkpoint 4: %f' % (time.time() - start))
             logger.debug('Process group %d completed outer loop %d/%d' % (color, i + 1, num_tasks))
             logger.debug(time.time() - start)
-
+            print('Hi!')
         del params
 
         if args.test and i == args.ntest:
@@ -252,7 +250,7 @@ if __name__ == '__main__':
         pool = MPIPool(root_comm)
 
         # requires our fork of schwimmbad
-        pool.map(mpi_main, task_list, fargs=(subcomm, color))
+        pool.map(mpi_main, task_list, fargs=(color,))
 
         if not pool.is_master():
             pool.wait()

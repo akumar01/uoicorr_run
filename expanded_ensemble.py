@@ -21,7 +21,7 @@ def load_covariance(index):
     else:
 
         # Load the indicies that constrain the random perturbations
-        with open('%s/repos/uoicorr_run/ensemble_expansion_indices.dat' % os.environ['HOME'], 'rb') as f:
+        with open('%s/repos/uoicorr_run/ensemble_expansion_idxs.dat' % os.environ['HOME'], 'rb') as f:
             expansion_idxs = pickle.load(f)
 
         index = index - 80
@@ -42,9 +42,8 @@ def load_covariance(index):
 
         random_state = RandomState(rep)
         sigma = wishart.rvs(df=n[nidx], scale=sigma0, random_state=random_state)
-
         # Normalize the matrix 
-        D = np.sqrt(np.diag(np.diag(sigma)))
+        D = np.diag(np.sqrt(np.diag(sigma)))
         sigma = np.linalg.inv(D) @ sigma @ np.linalg.inv(D)            
 
     return sigma, cov_param

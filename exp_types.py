@@ -59,7 +59,7 @@ class CV_Lasso(StandardLM_experiment):
         if selection_method == 'CV': 
             try:
                 logging.debug('Fitting!')
-            else:
+            except:
                 print('Fitting')
             lasso = PycassoCV(penalty='l1', n_alphas=48, 
                               gamma=3, alphas=self.alphas)
@@ -74,7 +74,7 @@ class CV_Lasso(StandardLM_experiment):
                 # If not yet fitted, run the pycasso lasso
                 try:
                     logging.debug('Fitting!')
-                else:
+                except:
                     print('Fitting')
                 lasso = PycassoLasso(alphas = self.alphas)
                 lasso.fit(X, y)
