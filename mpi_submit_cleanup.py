@@ -31,35 +31,32 @@ import logging
 
 def arrange_tasks(dirs):
 
-	# For each directory in the list of directories, 
-	# assemble the unifnished jobs as a tuple of results_manager object
-	# and index
-	task_list = []
-	root_dir = dirs[0].split('/')[:-1].join('')
+    # For each directory in the list of directories, 
+    # assemble the unifnished jobs as a tuple of results_manager object
+    # and index
+    task_list = []
+    root_dir = '/'.join(dirs[0].split('/')[:-2])
+    for i, dir_ in enumerate(dirs):
+        # the last numbers correspond to the index of the arg file
+        argnumber = int(dir_.split('_')[-1])
+        arg_file = '%s/master/params%d.dat' % (root_dir, argnumber)
 
-	for i, dir_ in enumerate(dirs):
-
-
-		# the last numbers correspond to the index of the arg file
-		argnumber = int(dir_.split('_')[-1])
-		arg_file = '%s/master/params%d.dat' % (root_dir, argnumber)
-
-	    # Open the arg file and read out metadata
-	    f = Indexed_Pickle(arg_file)
-	    f.init_read()
-	    total_tasks = len(f.index)
+        # Open the arg file and read out metadata
+        f = Indexed_Pickle(arg_file)
+        f.init_read()
+        total_tasks = len(f.index)
 
         try:
-            rmanager = ResultsManager.restore_from_directory(results_dir)
+            rmanager = ResultsManager.restore_from_directory(dir_)
         except:
-            rmanager = ResultsManager(total_tasks = total_tasks, directory = results_dir)
+            rmanager = ResultsManager(total_tasks = total_tasks, directory = dir_)
 
         # Take the difference between what has been done and what needs to be done
-	    todo = np.array(list(set(np.arange(total_tasks)).difference(set(rmanager.inserted_idxs()))))
+        todo = np.array(list(set(np.arange(total_tasks)).difference(set(rmanager.inserted_idxs()))))
 
-	    task_list.append((rmanager, arg_file, todo))
+        task_list.append((rmanager, arg_file, todo))
 
-	return task_list
+    return task_list
 
 def manage_comm():
 
@@ -82,7 +79,6 @@ def manage_comm():
     split_ranks = np.array_split(ranks, comm_splits)
     color = [i for i in np.arange(comm_splits) if rank in split_ranks[i]][0]
     subcomm_roots = [split_ranks[i][0] for i in np.arange(comm_splits)]
-
     subcomm = comm.Split(color, rank)
 
     nchunks = comm_splits
@@ -92,8 +88,7 @@ def manage_comm():
     # Create a group including the root of each subcomm (unused at the moment)
     global_group = comm.Get_group()
     root_group = MPI.Group.Incl(global_group, subcomm_roots)
-    roots_comm = comm.Create(root_group)
-
+    root_comm = comm.Create(root_group)
     return comm, rank, color, subcomm, subrank, root_comm
 
 def gen_data_(params, subcomm, subrank):
@@ -156,94 +151,94 @@ def gen_data_(params, subcomm, subrank):
 
 class MPIWorker():
 
-	def __init__(self, subcomm):
+    def __init__(self, subcomm):
 
-		# Initialize logging
-		# Start a new logfile for each job execution
-		logging.basicConfig(filename='app.log', filemode='w', 
-			format='%(asctime)s.%(msecs)03d : %(message)s')
-		
-		self.comm = subcomm
-		self.subrank = subcomm.rank
+        # Initialize logging
+        # Start a new logfile for each job execution
+        logging.basicConfig(filename='app.log', filemode='w', 
+            format='%(asctime)s.%(msecs)03d : %(message)s')
+        
+        self.comm = subcomm
+        self.subrank = subcomm.rank
 
 
-	def __call__(self, task_tuple):
+    def __call__(self, task_tuple):
 
-	    rmanager, arg_file, todo = task_tuple
-	    logging.debug('Starting %s, %d tasks' % (arg_file, len(todo)))
-	    # hard-code n_reg_params because why not
-	    if exp_type in ['EN', 'scad', 'mcp']:
-	        n_reg_params = 2
-	    else:
-	        n_reg_params = 1
+        rmanager, arg_file, todo = task_tuple
+        logging.debug('Starting %s, %d tasks' % (arg_file, len(todo)))
+        # hard-code n_reg_params because why not
+        if exp_type in ['EN', 'scad', 'mcp']:
+            n_reg_params = 2
+        else:
+            n_reg_params = 1
 
-	   	num_tasks = len(todo)
+        num_tasks = len(todo)
 
-	    # Open the arg file and read out metadata
-	    f = Indexed_Pickle(arg_file)
-	    f.init_read()
+        # Open the arg file and read out metadata
+        f = Indexed_Pickle(arg_file)
+        f.init_read()
 
-	    n_features = f.header['n_features']
-	    selection_methods = f.header['selection_methods']
-	    fields = f.header['fields']
+        n_features = f.header['n_features']
+        selection_methods = f.header['selection_methods']
+        fields = f.header['fields']
 
-	    exp_type = args.exp_type
-	    results_dir = rmanager.directory
+        exp_type = args.exp_type
+        results_dir = rmanager.directory
 
-	    for i in range(num_tasks):
-	        start = time.time()
-	        params = f.read(todo[i])
-	        params['comm'] = self.subcomm
-	        X, X_test, y, y_test, params = gen_data_(params, 
-	        										 self.subcomm, self.subrank)
+        for i in range(num_tasks):
+            start = time.time()
+            params = f.read(todo[i])
+            params['comm'] = self.subcomm
+            X, X_test, y, y_test, params = gen_data_(params, 
+                                                     self.subcomm, self.subrank)
 
-	        # Hard-coded convenience for SCAD/MCP
-	        if exp_type in ['scad', 'mcp']:
-	            exp = locate('exp_types.%s' % 'PYC')
-	            params['penalty'] = exp_type
-	        else:
-	            exp = locate('exp_types.%s' % exp_type)
-	        t1 = time.time()
-	        exp_results = exp.run(X, y, params, selection_methods)
-	        if subrank == 0:
-	            # print('checkpoint 2: %f' % (time.time() - start))
+            # Hard-coded convenience for SCAD/MCP
+            if exp_type in ['scad', 'mcp']:
+                exp = locate('exp_types.%s' % 'PYC')
+                params['penalty'] = exp_type
+            else:
+                exp = locate('exp_types.%s' % exp_type)
+            t1 = time.time()
+            exp_results = exp.run(X, y, params, selection_methods)
+            if subrank == 0:
+                # print('checkpoint 2: %f' % (time.time() - start))
 
-	            results_dict = init_results_container(selection_methods)
+                results_dict = init_results_container(selection_methods)
 
-	            #### Calculate and log results for each selection method
+                #### Calculate and log results for each selection method
 
-	            for selection_method in selection_methods:
+                for selection_method in selection_methods:
 
-	                for field in fields[selection_method]:
-	                    results_dict[selection_method][field] = calc_result(X, X_test, y, y_test,
-	                                                                           params['betas'].ravel(), field,
-	                                                                           exp_results[selection_method])
-	                    # print('result calculation time: %f' % (time.time() - t1))
-	            #print('Checkpoint 3: %f' % (time.time() - start))
-	            # Add results to results manager. This automatically saves the child's data
-	            t1 = time.time()
-	            rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
-	            #print('Checkpoint 4: %f' % (time.time() - start))
-	            logging.debug('Process group %d completed outer loop %d/%d' % (color, i + 1, num_tasks))
-	            logging.debug(time.time() - start)
+                    for field in fields[selection_method]:
+                        results_dict[selection_method][field] = calc_result(X, X_test, y, y_test,
+                                                                               params['betas'].ravel(), field,
+                                                                               exp_results[selection_method])
+                        # print('result calculation time: %f' % (time.time() - t1))
+                #print('Checkpoint 3: %f' % (time.time() - start))
+                # Add results to results manager. This automatically saves the child's data
+                t1 = time.time()
+                rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
+                #print('Checkpoint 4: %f' % (time.time() - start))
+                logging.debug('Process group %d completed outer loop %d/%d' % (color, i + 1, num_tasks))
+                logging.debug(time.time() - start)
 
-	        del params
+            del params
 
-	        if args.test and i == args.ntest:
-	            break
+            if args.test and i == args.ntest:
+                break
 
-	    f.close_read()
+        f.close_read()
 
-	    logging.debug('Total time: %f' % (time.time() - total_start))
-	    logging.debug('Job completed!')
+        logging.debug('Total time: %f' % (time.time() - total_start))
+        logging.debug('Job completed!')
 
 
 if __name__ == '__main__':
 
-	total_start = time.time()
+    total_start = time.time()
 
-	parser = argparse.ArgumentParser()
-	parser.add_argument('dirlist')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dirlist')
     parser.add_argument('exp_type', default = 'UoILasso')
     parser.add_argument('--comm_splits', type=int, default = None)
     parser.add_argument('-t', '--test', action = 'store_true')
@@ -252,22 +247,22 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # Open up a file containing the list of directories to clean up
-    with open(args.dirlist, 'rb') as f:
-    	dirlist = pickle.load(f)
-    	task_list = arrange_tasks(dirlist)
-
     # Create subcommunicators as needed
     comm, rank, color, subcomm, subrank, root_comm = manage_comm()
-
-    # Create pools out of root_comm
     worker = MPIWorker(subcomm)
-    pool = MPIPool(root_comm)
 
-    pool.map(main, task_list)
+    if subrank == 0:
 
-    if not pool.is_master():
-	    pool.wait()
-	    sys.exit(0)
+        # Open up a file containing the list of directories to clean up
+        with open(args.dirlist, 'rb') as f:
+            dirlist = pickle.load(f)
+            task_list = arrange_tasks(dirlist)
 
-	pool.close()
+        pool = MPIPool(root_comm)
+        pool.map(gen_data_, task_list)
+
+        if not pool.is_master():
+            pool.wait()
+            sys.exit(0)
+
+        pool.close()
