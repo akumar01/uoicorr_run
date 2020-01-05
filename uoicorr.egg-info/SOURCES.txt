@@ -1,0 +1,6 @@
+README.md
+setup.py
+uoicorr.egg-info/PKG-INFO
+uoicorr.egg-info/SOURCES.txt
+uoicorr.egg-info/dependency_links.txt
+uoicorr.egg-info/top_level.txt
