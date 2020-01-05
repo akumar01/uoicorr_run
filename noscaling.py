@@ -96,7 +96,7 @@ if __name__ == '__main__':
 
     # Split F and T into tasks
     tasks = itertools.product(T, F)
-
+    pdb.set_trace()
     pool.map(worker, tasks, callback = worker.save)
     
     pool.close()

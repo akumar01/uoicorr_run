@@ -8,10 +8,10 @@ script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
 
 ###### Master list of parameters to be iterated over #######
 
-exp_types =  ['UoILasso']
+exp_types =  ['CV_Lasso', 'scad', 'mcp']
 
 # Estimated worst case run-time for a single repitition for each algorithm in exp_types 
-algorithm_times = ['12:00:00',  '04:00:00', '02:00:00', '02:00:00', '02:00:00']
+algorithm_times = ['01:00:00', '01:00:00', '01:00:00']
 
 n_features = 500
 
@@ -72,11 +72,13 @@ comm_params['gamma'] = [3]
 ###############################################################
 
 # Which selection methods should we apply to the algorithms?
-comm_params['selection_methods'] = ['BIC', 'AIC', 'CV', 'gMDL', 'empirical_bayes', 'oracle']
+comm_params['selection_methods'] = ['BIC', 'AIC', 'BIC_ols', 'AIC_ols', 'CV', 'gMDL', 'empirical_bayes', 'oracle']
 # Which fields should we record for each selection method? 
 comm_params['fields'] = {'BIC' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
 						 'AIC' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'], 
-						 'CV' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
+						 'AIC_ols' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
+                         'BIC_ols' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
+                         'CV' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
                          'gMDL' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param'],
                          'empirical_bayes' : ['beta', 'beta_hats', 'FNR', 'FPR', 'sa', 'ee', 'r2', 'MSE', 'reg_param', 
                                               ], 

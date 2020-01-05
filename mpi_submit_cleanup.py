@@ -1,3 +1,5 @@
+import time
+t0 = time.time()
 import sys, os
 import pdb
 import itertools
@@ -8,7 +10,6 @@ import struct
 import numpy as np
 from mpi4py import MPI
 import h5py_wrapper
-import time
 from pydoc import locate
 from sklearn.preprocessing import StandardScaler
 
@@ -24,25 +25,29 @@ from results_manager import init_results_container, calc_result
 from schwimmbad import MPIPool
 from loguru import logger
 
+print('Import time: %f' % (time.time() - t0))
+
 # Reformat mpi_submit to take an entire directory of jobs that have been partially
 # completed and use schwimmbad to deal out fit responsibilities to each one
 
 # Prefer this to using the --resume flag
 
 def mpi_main(task_tuple):
-
     # Unpack args
-    rmanager, arg_file, todo, dir_logger, color = task_tuple
+    rmanager, arg_file, idx, color = task_tuple
     exp_type = args.exp_type
     results_dir = rmanager.directory
-    dir_logger.debug('Starting %s, %d tasks' % (arg_file, len(todo)))
+
+    argnumber = int(results_dir.split('_')[-1])
+    print(argnumber) 
+    dir_logger = logger.bind(logid = argnumber)
+    dir_logger.debug('Starting task %d of %s' % (idx, arg_file))
+    start = time.time()
     # hard-code n_reg_params because why not
     if exp_type in ['EN', 'scad', 'mcp']:
         n_reg_params = 2
     else:
         n_reg_params = 1
-
-    num_tasks = len(todo)
 
     # Open the arg file and read out metadata
     f = Indexed_Pickle(arg_file)
@@ -52,52 +57,39 @@ def mpi_main(task_tuple):
     selection_methods = f.header['selection_methods']
     fields = f.header['fields']
 
-    for i in range(num_tasks):
-        start = time.time()
-        params = f.read(todo[i])
-        params['comm'] = subcomm
-        X, X_test, y, y_test, params = gen_data_(params, 
-                                                 subcomm, subrank)
+    params = f.read(idx)
+    params['comm'] = subcomm
+    X, X_test, y, y_test, params = gen_data_(params, 
+                                         subcomm, subrank)
+    dir_logger.debug('Generated data!')
+    # Hard-coded convenience for SCAD/MCP
+    if exp_type in ['scad', 'mcp']:
+        exp = locate('exp_types.%s' % 'PYC')
+        params['penalty'] = exp_type
+    else:
+        exp = locate('exp_types.%s' % exp_type)
+    
+    exp_results = exp.run(X, y, params, selection_methods)
+    if subrank == 0:
+        # print('checkpoint 2: %f' % (time.time() - start))
 
-        # Hard-coded convenience for SCAD/MCP
-        if exp_type in ['scad', 'mcp']:
-            exp = locate('exp_types.%s' % 'PYC')
-            params['penalty'] = exp_type
-        else:
-            exp = locate('exp_types.%s' % exp_type)
-        t1 = time.time()
-        exp_results = exp.run(X, y, params, selection_methods)
-        if subrank == 0:
-            # print('checkpoint 2: %f' % (time.time() - start))
+        results_dict = init_results_container(selection_methods)
 
-            results_dict = init_results_container(selection_methods)
+        #### Calculate and log results for each selection method
 
-            #### Calculate and log results for each selection method
+        for selection_method in selection_methods:
 
-            for selection_method in selection_methods:
-
-                for field in fields[selection_method]:
-                    results_dict[selection_method][field] = calc_result(X, X_test, y, y_test,
-                                                                           params['betas'].ravel(), field,
-                                                                           exp_results[selection_method])
-                    # print('result calculation time: %f' % (time.time() - t1))
-            #print('Checkpoint 3: %f' % (time.time() - start))
-            # Add results to results manager. This automatically saves the child's data
-            t1 = time.time()
-            rmanager.add_child(results_dict, idx = chunk_param_list[chunk_idx][i])
-            #print('Checkpoint 4: %f' % (time.time() - start))
-            dir_logger.debug('Process group %d completed outer loop %d/%d' % (color, i + 1, num_tasks))
-            dir_logger.debug(time.time() - start)
-            print('Hi!')
-        del params
-
-        if args.test and i == args.ntest:
-            break
+            for field in fields[selection_method]:
+                results_dict[selection_method][field] = calc_result(X, X_test, y, y_test,
+                                                                   params['betas'].ravel(), field,
+                                                                   exp_results[selection_method])
+        
+        rmanager.add_child(results_dict, idx = idx)
 
     f.close_read()
 
-    dir_logger.debug('Total time: %f' % (time.time() - total_start))
-    dir_logger.debug('Job completed!')
+    dir_logger.debug('Total time: %f' % (time.time() - start))
+    dir_logger.debug('Task completed!')
 
 def arrange_tasks(dirs):
 
@@ -123,17 +115,20 @@ def arrange_tasks(dirs):
 
         # Take the difference between what has been done and what needs to be done
         todo = np.array(list(set(np.arange(total_tasks)).difference(set(rmanager.inserted_idxs()))))
-
-        # Add a sink to the logger
-        logfile = open('%s/log' % dir_, 'w')
-        # Create a wrapper for the base logger corresponding to this execution        
-        dir_logger = logger.bind(logid=argnumber) 
-        # Create a sink with a filter that matches the logid
-        dir_logger.add(logfile, filter=lambda record: record['logid'] == argnumber if 'logid' in list(record.keys()) else False)
-        task_list.append((rmanager, arg_file, todo, dir_logger))
+        
+        for idx in todo:
+            task_list.append((rmanager, arg_file, idx))
 
     return task_list
 
+def init_loggers(dirlist):
+
+    for dir_ in dirlist:
+        argnumber = int(dir_.split('_')[-1]) 
+        # Create a sink with a filter that matches the logid
+        logger.add('%s/log' % dir_, filter=lambda record: record['extra'].get('logid') == argnumber)
+        # logger.add('%s/log' % dir_)
+        
 def manage_comm():
 
     '''Create a comm object and split it into the appropriate number of subcomms'''
@@ -242,14 +237,20 @@ if __name__ == '__main__':
 
     # Create subcommunicators as needed
     comm, rank, color, subcomm, subrank, root_comm = manage_comm()
+    
+    with open(args.dirlist, 'rb') as f:
+        dirlist = pickle.load(f)
+    
+    init_loggers(dirlist)
+
+    if rank == 0:
+        task_list = arrange_tasks(dirlist)
+    else:
+        task_list = None
+
+    task_list = comm.bcast(task_list, root=0)
 
     if subrank == 0:
-
-        # Open up a file containing the list of directories to clean up
-        with open(args.dirlist, 'rb') as f:
-            dirlist = pickle.load(f)
-            task_list = arrange_tasks(dirlist)
-
         pool = MPIPool(root_comm)
 
         # requires our fork of schwimmbad
