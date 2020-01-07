@@ -12,9 +12,6 @@ from pyuoi.linear_model import UoI_ElasticNet
 from pyc_based.lm import PycassoLasso, PycassoElasticNet
 from pyc_based.pycasso_cv import PycassoCV, PycassoGrid, PycEnCV
 
-from r_based.slope import SLOPE as SLOPE_
-from r_based.slope import SLOPE_CV
-
 # from sklbased import EN_Grid
 
 from selection import Selector, UoISelector
@@ -312,50 +309,6 @@ class PYC(StandardLM_experiment):
                                     self.reg_params, X, y, true_model)
             self.results[selection_method] = sdict
 
-# Run R to solve slope
-class SLOPE(StandardLM_experiment):
-
-    @classmethod
-    def run(self, X, y, args, selection_methods = ['BIC']):
-
-        self.lambda_method = args['lambda_method']
-        self.lambda_args = args['lambda_args']
-        super(SLOPE, self).run(X, y, args, selection_methods)        
-        return self.results
-
-    @classmethod
-    def fit_and_select(self, X, y, selection_method, true_model):
-
-        if selection_method == 'CV':
-
-            slope = SLOPE_CV(nfolds = self.cv_splits, 
-                             lambda_method=self.lambda_method, 
-                             lambda_spec=self.lambda_args)
-            slope.fit(X, y)
-            self.results[selection_method]['coefs'] = slope.coef_
-            # Store the FDR
-            self.results[selection_method]['reg_param'] = slope.fdr_
-
-        else:
-            if not hasattr(self, 'fitted_estimator'):
-     
-                _, n_features = X.shape
-
-                estimates = np.zeros((self.lambda_args.size, n_features))
-                for i, fdr in enumerate(self.lambda_args):
-                    slope = SLOPE_(lambda_method='FDR', lambda_spec=fdr)
-                    slope.fit(X, y)
-                    estimates[i, :] = slope.coef_
-
-                self.fitted_estimator = dummy_estimator(coefs = estimates, 
-                                                        reg_params = self.lambda_args)
-            selector = Selector(selection_method = selection_method)
-
-            sdict = selector.select(self.fitted_estimator.coefs, 
-                                                    self.fitted_estimator.reg_params, 
-                                                    X, y, true_model)
-
-            self.results[selection_method]= sdict
 
 # Convenience Class
 class dummy_estimator():

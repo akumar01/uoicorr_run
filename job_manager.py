@@ -307,6 +307,8 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
 
             # Arguments common across jobs
             sb.write('#!/bin/bash\n')
+            # USE SHIFTER IMAGE
+            sb.write('#SBATCH --image=docker:akumar25/nersc_uoicorr:latest\n')
             sb.write('#SBATCH --qos=%s\n' % qos)
             sb.write('#SBATCH --constraint=knl\n')            
             sb.write('#SBATCH -N %d\n' % n_nodes)
@@ -333,12 +335,12 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
                 if task['exp_type'] == 'UoILasso':
                     # comm_splits = np.floor(68 * nodes_per_file/25).astype(int)
                     comm_splits = 4
-                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
+                    sb.write('srun -N %d -n %d -c 4 shifter python3 -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
                             (nodes_per_file, 68 * nodes_per_file,
                             script_dir, script, task['arg_file'], results_dir, task['exp_type'],
                             comm_splits, srun_flags))
                 else:
-                    sb.write('srun -N %d -n %d -c 4 python3 -u %s/%s %s %s %s %s &\n' % \
+                    sb.write('srun -N %d -n %d -c 4 shifter python3 -u %s/%s %s %s %s %s &\n' % \
                             (nodes_per_file, 68 * nodes_per_file,
                             script_dir, script, task['arg_file'], results_dir, task['exp_type'],
                             srun_flags))
@@ -370,7 +372,8 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
     if exp_types is None:
         exp_types = args.exp_types
     algorithm_times = args.algorithm_times
-    script_dir = args.script_dir
+    # Requires use of shifter image
+    script_dir = '/home/uoicorr_run'
 
     if hasattr(args, 'desc'):
         desc = args.desc
