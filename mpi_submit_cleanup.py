@@ -13,6 +13,8 @@ import h5py_wrapper
 from pydoc import locate
 from sklearn.preprocessing import StandardScaler
 
+from memory_profiler import profile
+
 from mpi_utils.ndarray import Bcast_from_root, Gatherv_rows, Gather_ndlist
 
 from job_utils.results import  ResultsManager
@@ -23,7 +25,7 @@ from expanded_ensemble import load_covariance
 from results_manager import init_results_container, calc_result
 
 from schwimmbad import MPIPool
-from loguru import logger
+# from loguru import logger
 
 print('Import time: %f' % (time.time() - t0))
 
@@ -31,7 +33,7 @@ print('Import time: %f' % (time.time() - t0))
 # completed and use schwimmbad to deal out fit responsibilities to each one
 
 # Prefer this to using the --resume flag
-
+ 
 def mpi_main(task_tuple):
     # Unpack args
     rmanager, arg_file, idx, color = task_tuple
@@ -40,8 +42,8 @@ def mpi_main(task_tuple):
 
     argnumber = int(results_dir.split('_')[-1])
     print(argnumber) 
-    dir_logger = logger.bind(logid = argnumber)
-    dir_logger.debug('Starting task %d of %s' % (idx, arg_file))
+    #dir_logger = logger.bind(logid = argnumber)
+    #dir_logger.debug('Starting task %d of %s' % (idx, arg_file))
     start = time.time()
     # hard-code n_reg_params because why not
     if exp_type in ['EN', 'scad', 'mcp']:
@@ -61,7 +63,7 @@ def mpi_main(task_tuple):
     params['comm'] = subcomm
     X, X_test, y, y_test, params = gen_data_(params, 
                                          subcomm, subrank)
-    dir_logger.debug('Generated data!')
+    #dir_logger.debug('Generated data!')
     # Hard-coded convenience for SCAD/MCP
     if exp_type in ['scad', 'mcp']:
         exp = locate('exp_types.%s' % 'PYC')
@@ -88,8 +90,8 @@ def mpi_main(task_tuple):
 
     f.close_read()
 
-    dir_logger.debug('Total time: %f' % (time.time() - start))
-    dir_logger.debug('Task completed!')
+    #dir_logger.debug('Total time: %f' % (time.time() - start))
+    #dir_logger.debug('Task completed!')
 
 def arrange_tasks(dirs):
 
@@ -126,7 +128,7 @@ def init_loggers(dirlist):
     for dir_ in dirlist:
         argnumber = int(dir_.split('_')[-1]) 
         # Create a sink with a filter that matches the logid
-        logger.add('%s/log' % dir_, filter=lambda record: record['extra'].get('logid') == argnumber)
+        #logger.add('%s/log' % dir_, filter=lambda record: record['extra'].get('logid') == argnumber)
         # logger.add('%s/log' % dir_)
         
 def manage_comm():
@@ -241,10 +243,11 @@ if __name__ == '__main__':
     with open(args.dirlist, 'rb') as f:
         dirlist = pickle.load(f)
     
-    init_loggers(dirlist)
+    # init_loggers(dirlist)
 
     if rank == 0:
         task_list = arrange_tasks(dirlist)
+        task_list = task_list[0:3]
     else:
         task_list = None
 

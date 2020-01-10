@@ -168,12 +168,15 @@ def main(args):
         n_reg_params = 1
 
     for i in range(num_tasks):
+        if i < args.start_idx:
+            print('Skipping %d' % i)
+            continue
+
         start = time.time()
         params = f.read(chunk_param_list[chunk_idx][i])
         params['comm'] = subcomm
 
-
-        X, X_test, y, y_test, params = gen_data_(params, subcomm, subrank)
+        X, X_test, y, y_test, params = gen_data_(params, subcomm, subrank) 
         # if subrank == 0:
             # print('Checkpoint 1: %f' % (time.time() - start))
 
@@ -209,7 +212,7 @@ def main(args):
 
         del params
 
-        if args.test and i == args.ntest:
+        if args.test and i == args.ntest + args.start_idx:
             break
 
     f.close_read()
@@ -240,6 +243,9 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--test', action = 'store_true')
     # Number of reps to break after if we are just testing
     parser.add_argument('--ntest', type = int, default = 1)
+
+    # Rep to start out (useful if you want to start near the end for debugging purposes)
+    parser.add_argument('--start_idx', type = int, default = 0)
 
     # Does this job need to be resumed?
     parser.add_argument('-r', '--resume', action='store_true')

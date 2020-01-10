@@ -12,7 +12,7 @@ from pyuoi.linear_model import UoI_ElasticNet
 from pyc_based.lm import PycassoLasso, PycassoElasticNet
 from pyc_based.pycasso_cv import PycassoCV, PycassoGrid, PycEnCV
 
-# from sklbased import EN_Grid
+from skl_based.lm import EN_Grid
 
 from selection import Selector, UoISelector
 
@@ -28,7 +28,8 @@ class StandardLM_experiment():
         self.cv_splits = 5
 
         # Draw alphas using the _alpha_grid method
-        self.alphas = _alpha_grid(X, y.ravel(), n_alphas = self.n_alphas)
+        if not hasattr(self, 'alphas'):
+            self.alphas = _alpha_grid(X, y.ravel(), n_alphas = self.n_alphas)
 
         # Container for results
         self.results = {selection_method : {} 
@@ -93,6 +94,9 @@ class EN(StandardLM_experiment):
     @classmethod
     def run(self, X, y, args, selection_methods = ['CV']):
         self.l1_ratios = args['l1_ratios']
+        self.alphas = []
+        for l1_ratio in self.l1_ratios:
+            self.alphas.append(_alpha_grid(X, y, l1_ratio = l1_ratio, n_alphas = args['n_alphas']))
         results = super(EN, self).run(X, y, args, selection_methods)
         return results
 
@@ -107,9 +111,8 @@ class EN(StandardLM_experiment):
                 logging.debug('Fitting!')
             except:
                 print('Fitting!')
-            en = ElasticNetCV(fit_intercept=False, cv=5, n_alphas=25, l1_ratio=self.l1_ratios)
+            en = ElasticNetCV(fit_intercept=False, cv=5, n_alphas=self.n_alphas, l1_ratio=self.l1_ratios)
             en.fit(X, y.ravel())
-
             self.results[selection_method]['coefs'] = en.coef_
             self.results[selection_method]['reg_param'] = [en.alpha_, en.l1_ratio_]
         else:
@@ -123,10 +126,11 @@ class EN(StandardLM_experiment):
                 en = EN_Grid(l1_ratios=self.l1_ratios, l1_params=self.alphas)
                 en.fit(X, y)
                 estimates = en.coef_
-                reg_params = np.zeros((self.alphas.size, 2))
-                reg_params[:, 0] = self.l1_ratios
-                reg_params[:, 1] = self.alphas
+                reg_params = np.zeros((self.n_alphas * len(self.l1_ratios), 2))
+                reg_params[:, 0] = np.array([l1r for l1r in self.l1_ratios for alpha in range(self.n_alphas)])
+                reg_params[:, 1] = np.array(self.alphas).ravel()
                 self.fitted_estimator = en
+                self.fitted_estimator.reg_params = reg_params
             selector = Selector(selection_method)
             sdict = selector.select(self.fitted_estimator.coef_, 
                                                     self.fitted_estimator.reg_params, X, y, true_model)

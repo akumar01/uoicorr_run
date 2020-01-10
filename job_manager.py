@@ -308,7 +308,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
             # Arguments common across jobs
             sb.write('#!/bin/bash\n')
             # USE SHIFTER IMAGE
-            sb.write('#SBATCH --image=docker:akumar25/nersc_uoicorr:latest\n')
+            # sb.write('#SBATCH --image=docker:akumar25/nersc_uoicorr:latest\n')
             sb.write('#SBATCH --qos=%s\n' % qos)
             sb.write('#SBATCH --constraint=knl\n')            
             sb.write('#SBATCH -N %d\n' % n_nodes)
@@ -320,6 +320,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
             sb.write('#SBATCH --mail-type=FAIL\n')
             # Work with out own Anaconda environment
             # To make this work, we had to add some paths to our .bash_profile.ext
+            ## UNNECESSARY WITH SHIFTER
             sb.write('source ~/anaconda3/bin/activate\n')
             sb.write('source activate nse\n')
 
@@ -329,18 +330,20 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
 
             for i2, task in enumerate(chunk):
 
+                arg_no = int(task['arg_file'].split('.dat')[0].split('params')[1])
+
                 # results files need to be handled separately for each line
-                results_dir = '%s/%s_%d' % (sbatch_dir, jobname, i2)
+                results_dir = '%s/%s_%d' % (sbatch_dir, jobname, arg_no)
                 # Allocate 50 threads for parallelizing UoI itself, use this to determine comm_splits 
                 if task['exp_type'] == 'UoILasso':
                     # comm_splits = np.floor(68 * nodes_per_file/25).astype(int)
                     comm_splits = 4
-                    sb.write('srun -N %d -n %d -c 4 shifter python3 -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
+                    sb.write('srun -N %d -n %d -c 4 python -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
                             (nodes_per_file, 68 * nodes_per_file,
                             script_dir, script, task['arg_file'], results_dir, task['exp_type'],
                             comm_splits, srun_flags))
                 else:
-                    sb.write('srun -N %d -n %d -c 4 shifter python3 -u %s/%s %s %s %s %s &\n' % \
+                    sb.write('srun -N %d -n %d -c 4 python -u %s/%s %s %s %s %s &\n' % \
                             (nodes_per_file, 68 * nodes_per_file,
                             script_dir, script, task['arg_file'], results_dir, task['exp_type'],
                             srun_flags))
@@ -355,7 +358,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
 # srun_opts: options to feed into the srun command (for example, n tasks, n cpus per task)
 def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
                          skip_argfiles = False, single_test = False, exp_types=None,
-                         n_nodes=100, srun_flags=''):
+                         n_nodes=100, srun_flags='', paths=None):
 
     if not os.path.exists(jobdir):
         os.makedirs(jobdir)
@@ -373,7 +376,7 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         exp_types = args.exp_types
     algorithm_times = args.algorithm_times
     # Requires use of shifter image
-    script_dir = '/home/uoicorr_run'
+    script_dir = '/global/homes/a/akumar25/repos/uoicorr_run'
 
     if hasattr(args, 'desc'):
         desc = args.desc
@@ -415,12 +418,14 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         paths, ntasks = generate_arg_files(argfile_array, jobdir)
 
     else:
-        # Need to get paths and ntasks
-        paths = glob('%s/master/*.dat' % jobdir)
+
+        if paths is None:
+            # Need to get paths and ntasks
+            paths = glob('%s/master/*.dat' % jobdir)
 
         # Sort naturally
         paths = natsort.natsorted(paths)
-    
+ 
     # Create an sbatch_array used to generate sbatch files that specifies exp_type, job_time,
     # num_tasks, and the path to the corresponding arg_file
 
