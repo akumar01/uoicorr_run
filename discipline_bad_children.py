@@ -36,12 +36,9 @@ print('Import time: %f' % (time.time() - t0))
  
 def mpi_main(task_tuple):
     # Unpack args
-    rmanager, arg_file, idx, color = task_tuple
+    rmanager, arg_file, idx, argnumber, color = task_tuple
     exp_type = args.exp_type
     results_dir = rmanager.directory
-
-    argnumber = int(results_dir.split('_')[-1])
-    print(argnumber) 
     #dir_logger = logger.bind(logid = argnumber)
     #dir_logger.debug('Starting task %d of %s' % (idx, arg_file))
     start = time.time()
@@ -89,7 +86,7 @@ def mpi_main(task_tuple):
         rmanager.add_child(results_dict, idx = idx)
 
     f.close_read()
-
+    print('Fini!')
     #dir_logger.debug('Total time: %f' % (time.time() - start))
     #dir_logger.debug('Task completed!')
 
@@ -97,12 +94,16 @@ def arrange_tasks(bad_children, root_dir, exp_type):
 
     task_list = []
     for i, child in enumerate(bad_children):
-        argnumber = int(child['path'].split('_/child')[0].split('_')[2])
+        try:
+            argnumber = int(child['path'].split('/child')[0].split('_')[2])
+        except:
+             argnumber = int(child['path'].split('//')[0].split('_')[3])
+            
         childir = '%s/%s/%s' % (root_dir, exp_type, child['path'].split('/child')[0])
         arg_file = '%s/master/params%d.dat' % (root_dir, argnumber)
         rmanager = ResultsManager(total_tasks = 2880, directory = childir)
         idx = child['idx']        
-        task_list.append((rmanager, arg_file, idx))
+        task_list.append((rmanager, arg_file, idx, argnumber))
 
     return task_list
 
@@ -232,7 +233,9 @@ if __name__ == '__main__':
             bad_children.extend(pickle.load(f))
 
     if rank == 0:
-        task_list = arrange_tasks(bad_children)
+        root_dir = '/'.join(args.source_dir.split('/')[0:6])
+        task_list = arrange_tasks(bad_children, root_dir, args.exp_type)
+        pdb.set_trace()
     else:
         task_list = None
 

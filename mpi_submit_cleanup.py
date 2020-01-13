@@ -13,8 +13,6 @@ import h5py_wrapper
 from pydoc import locate
 from sklearn.preprocessing import StandardScaler
 
-from memory_profiler import profile
-
 from mpi_utils.ndarray import Bcast_from_root, Gatherv_rows, Gather_ndlist
 
 from job_utils.results import  ResultsManager
@@ -89,8 +87,7 @@ def mpi_main(task_tuple):
         rmanager.add_child(results_dict, idx = idx)
 
     f.close_read()
-
-    #dir_logger.debug('Total time: %f' % (time.time() - start))
+    print('Total time: %f' % (time.time() - start))
     #dir_logger.debug('Task completed!')
 
 def arrange_tasks(dirs):
@@ -149,8 +146,14 @@ def manage_comm():
 
     # Use array split to do comm.split
 
+    # Take the root node and set it aside - this is what schwimmbad will use to coordinate
+    # the other groups
+
     ranks = np.arange(numproc)
     split_ranks = np.array_split(ranks, comm_splits)
+    # if rank == 0:
+    #     color = 0
+    # else:
     color = [i for i in np.arange(comm_splits) if rank in split_ranks[i]][0]
     subcomm_roots = [split_ranks[i][0] for i in np.arange(comm_splits)]
     subcomm = comm.Split(color, rank)
@@ -239,7 +242,7 @@ if __name__ == '__main__':
 
     # Create subcommunicators as needed
     comm, rank, color, subcomm, subrank, root_comm = manage_comm()
-    
+    print('rank: %d, color %d: subrank %d' % (rank, color, subrank))
     with open(args.dirlist, 'rb') as f:
         dirlist = pickle.load(f)
     
@@ -247,7 +250,6 @@ if __name__ == '__main__':
 
     if rank == 0:
         task_list = arrange_tasks(dirlist)
-        task_list = task_list[0:3]
     else:
         task_list = None
 
