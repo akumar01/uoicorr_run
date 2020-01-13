@@ -7,7 +7,10 @@ from job_utils.results import ResultsManager
 
 path = sys.argv[1]
 exp_type = sys.argv[2]
-dirs = glob.glob('%s/%s_job0_*')
+savedir = sys.argv[3]
+nsplits = sys.argv[4]
+
+dirs = glob.glob('%s/%s_job0_*' % (path, exptype))
 
 # For each directory in the list of directories, 
 # assemble the unifnished jobs as a tuple of results_manager object
@@ -35,5 +38,12 @@ for i, dir_ in enumerate(dirs):
     for idx in todo:
         task_list.append((rmanager, arg_file, idx))
 
-with open('%s_tasks.dat', 'wb') as f:
-    f.write(pickle.dumps(task_list))
+# Top level splits - done across the 
+task_list = np.array_split(task_list, nsplits)
+
+if not os.path.exists(savedir):
+    os.makedirs(savedir)
+
+for split in range(nsplits):
+    with open('%s/%s_tasks%d.dat' % (savedir, exp_type, split), 'wb') as f:
+        f.write(pickle.dumps(task_list[split]))
