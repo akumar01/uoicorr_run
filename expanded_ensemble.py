@@ -7,12 +7,12 @@ import pickle
 from utils import gen_covariance
 import glob
 
-def load_covariance(index):
+def load_covariance(index, path=os.environ['HOME'] + '/repos'):
 
     p = 500
     
     # Load the orignal set of covariance parameters
-    with open('%s/repos/uoicorr_run/unique_cov_param.dat' % os.environ['HOME'], 'rb') as f:
+    with open('%s/uoicorr_run/unique_cov_param.dat' % path, 'rb') as f:
         cov_params = pickle.load(f)
 
     if index < 80:
@@ -21,10 +21,11 @@ def load_covariance(index):
     else:
 
         # Load the indicies that constrain the random perturbations
-        with open('%s/repos/uoicorr_run/ensemble_expansion_idxs.dat' % os.environ['HOME'], 'rb') as f:
+        with open('%s/uoicorr_run/ensemble_expansion_indices' % path, 'rb') as f:
             expansion_idxs = pickle.load(f)
 
         index = index - 80
+        ensemble_index = expansion_idxs[index]
 
         # How many Wishart matrices to generate
         nreps = 20
@@ -36,7 +37,7 @@ def load_covariance(index):
         sparsity = np.logspace(np.log10(0.02), 0, 15)[:-1]
 
        	# Unravel the index into a 3-tuple
-       	cidx, nidx, rep = np.unravel_index(int(index), (len(cov_params), n.size, nreps))
+       	cidx, nidx, rep = np.unravel_index(int(ensemble_index), (len(cov_params), n.size, nreps))
         cov_param = cov_params[cidx]
         sigma0 = gen_covariance(500, **cov_param)
 
