@@ -13,7 +13,7 @@ def load_covariance(index, path=os.environ['HOME'] + '/repos'):
     
     # Load the orignal set of covariance parameters
     with open('%s/uoicorr_run/unique_cov_param.dat' % path, 'rb') as f:
-        cov_params = pickle.load(f)
+       cov_params = pickle.load(f)
 
     if index < 80:
         sigma = gen_covariance(500, **cov_params[index])
