@@ -118,13 +118,16 @@ if __name__ == '__main__':
         scad.set_index(np.arange(scad.shape[0]), inplace=True)
         en.set_index(np.arange(en.shape[0]), inplace=True)
 
-        dframes = [lasso, mcp, scad, en]
+        kappa = 5
+        np_ratio = 4
+
+
+
+        dframes = [apply_df_filters(df, kappa=kappa, np_ratio=np_ratio) for df in [lasso, mcp, scad, en]]
         dframe_names = ['Lasso', 'MCP', 'SCAD', 'EN']
         sparsity = np.unique(lasso['sparsity'].values)
         betawidth = np.unique(lasso['betawidth'].values)
         selection_methods = np.unique(lasso['selection_method'].values)
-        kappa = 5
-        np_ratio = 4
         cov_idxs = np.arange(80)
 
         beta_fnames = ['%s/%s_pp_beta.h5' % (root_dir, dfname) for dfname in ['lasso', 'mcp', 'scad', 'en']]
@@ -132,7 +135,6 @@ if __name__ == '__main__':
         task_list = []
         print('Arranging task list!')
         for i, dframe in enumerate(dframes):
-            dframe = apply_df_filters(dframe, kappa=kappa, np_ratio=np_ratio)
             dframe.sort_values(inplace=True, by=['selection_method', 'betawidth', 'sparsity', 'cov_idx'])
             assert(dframe.shape[0] % 20 == 0)
             for j in np.arange(dframe.shape[0]/20).astype(int):
@@ -140,7 +142,13 @@ if __name__ == '__main__':
     else:
         task_list = None
 
+    task_list = comm.bcast(task_list)
     aggregator = Aggregator(beta_fnames=beta_fnames)
-    pool.map(aggregator.calc_bias_var, task_list, callback=aggregator, map_fn=aggregator.map)
-    pool.close()
+
+    chunked_task_list = np.array_split(task_list, comm.size)
+
+    for task in chunked_task_list[comm.rank]:
+
+        aggregator.
+
 
