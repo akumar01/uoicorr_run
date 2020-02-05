@@ -110,7 +110,7 @@ def fix_datatypes(obj):
         obj = obj.item()
     return obj
 
-def generate_arg_files(argfile_array, jobdir):
+def generate_arg_files(argfile_array, jobdir, validate=True):
 
     # Load these files for some validation
     with open('unique_cov_param.dat', 'rb') as f:
@@ -165,7 +165,8 @@ def generate_arg_files(argfile_array, jobdir):
                 param_comb['n_samples'] = n_samples
 
         # trim away parameter combinations that do not pass validation (i.e. all betas end up being 0)
-        iter_param_list = validate_params(iter_param_list, cov_params, eei)
+        if validate:
+            iter_param_list = validate_params(iter_param_list, cov_params, eei)
 
         # Make n_reps independent copies of iter_param_list
         iter_param_list = [deepcopy(iter_param_list) for _ in range(arg_['reps'])]
@@ -267,7 +268,7 @@ def generate_sbatch_scripts(sbatch_array, sbatch_dir, script_dir, srun_flags='')
                      % (script_dir, script, sbatch['arg_file'],
                      results_file, sbatch['exp_type'], srun_flags))
 
-def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_flags=''):
+def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_flags='', shifter=True):
 
     total_files = len(sbatch_array)
     
@@ -308,7 +309,8 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
             # Arguments common across jobs
             sb.write('#!/bin/bash\n')
             # USE SHIFTER IMAGE
-            # sb.write('#SBATCH --image=docker:akumar25/nersc_uoicorr:latest\n')
+            if shifter:
+                sb.write('#SBATCH --image=docker:akumar25/nersc_conda_uoicorr:latest\n')
             sb.write('#SBATCH --qos=%s\n' % qos)
             sb.write('#SBATCH --constraint=knl\n')            
             sb.write('#SBATCH -N %d\n' % n_nodes)
@@ -338,15 +340,29 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
                 if task['exp_type'] == 'UoILasso':
                     # comm_splits = np.floor(68 * nodes_per_file/25).astype(int)
                     comm_splits = 4
-                    sb.write('srun -N %d -n %d -c 4 python -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
-                            (nodes_per_file, 68 * nodes_per_file,
-                            script_dir, script, task['arg_file'], results_dir, task['exp_type'],
-                            comm_splits, srun_flags))
+                    if shifter:
+                        sb.write('srun -N %d -n %d -c 4 shifter --entrypoint python -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
+                                 (nodes_per_file, 68 * nodes_per_file,
+                                 script_dir, script, task['arg_file'], results_dir, task['exp_type'],
+                                 comm_splits, srun_flags))
+ 
+                    else:
+                        sb.write('srun -N %d -n %d -c 4 python -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
+                                 (nodes_per_file, 68 * nodes_per_file,
+                                 script_dir, script, task['arg_file'], results_dir, task['exp_type'],
+                                 comm_splits, srun_flags))
                 else:
-                    sb.write('srun -N %d -n %d -c 4 python -u %s/%s %s %s %s %s &\n' % \
-                            (nodes_per_file, 68 * nodes_per_file,
-                            script_dir, script, task['arg_file'], results_dir, task['exp_type'],
-                            srun_flags))
+                    if shifter:
+                        sb.write('srun -N %d -n %d -c 4 shifter --entrypoint python -u %s/%s %s %s %s %s &\n' % \
+                                 (nodes_per_file, 68 * nodes_per_file,
+                                 script_dir, script, task['arg_file'], results_dir, task['exp_type'],
+                                 srun_flags))
+
+                    else:
+                        sb.write('srun -N %d -n %d -c 4 python -u %s/%s %s %s %s %s &\n' % \
+                                 (nodes_per_file, 68 * nodes_per_file,
+                                 script_dir, script, task['arg_file'], results_dir, task['exp_type'],
+                                 srun_flags))
 
             sb.write('wait')
 
@@ -358,7 +374,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
 # srun_opts: options to feed into the srun command (for example, n tasks, n cpus per task)
 def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
                          skip_argfiles = False, single_test = False, exp_types=None,
-                         n_nodes=100, srun_flags='', paths=None):
+                         n_nodes=100, srun_flags='', paths=None, validate=True):
 
     if not os.path.exists(jobdir):
         os.makedirs(jobdir)
@@ -415,7 +431,7 @@ def create_job_structure(submit_file, jobdir, qos, numtasks, cpu_per_task,
         if not os.path.exists('%s/master' % jobdir):
             os.mkdir('%s/master' % jobdir)
         # Generate the arg_files:
-        paths, ntasks = generate_arg_files(argfile_array, jobdir)
+        paths, ntasks = generate_arg_files(argfile_array, jobdir, validate)
 
     else:
 

@@ -39,7 +39,7 @@ class Selector():
             sdict = self.aBIC_selector(X, y, solutions, 
                                        reg_params, true_model)
         else:
-            raise ValueError('Incorrect selection method specified')
+            raise ValueError('Selection method %s not supported!' % self.selection_method)
         return sdict
 
     def selector(self, X, y, y_pred, solutions, reg_params):

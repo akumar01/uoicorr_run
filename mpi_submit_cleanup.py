@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 t0 = time.time()
 import sys, os
 import pdb
@@ -18,7 +19,7 @@ from mpi_utils.ndarray import Bcast_from_root, Gatherv_rows, Gather_ndlist
 from job_utils.results import  ResultsManager
 from job_utils.idxpckl import Indexed_Pickle
 
-from utils import sparsify_beta, gen_data
+from utils import sparsify_beta, gen_data, gen_covariance
 from expanded_ensemble import load_covariance
 from results_manager import init_results_container, calc_result
 
@@ -34,12 +35,15 @@ print('Import time: %f' % (time.time() - t0))
  
 def mpi_main(task_tuple):
     # Unpack args
-    rmanager, arg_file, idx, color = task_tuple
+    task, subcomm = task_tuple
+    subrank = subcomm.rank
+    rmanager, arg_file, idx = task
     exp_type = args.exp_type
     results_dir = rmanager.directory
 
-    argnumber = int(results_dir.split('_')[-1])
-    print(argnumber) 
+    argnumber = int(results_dir.split('_')[-1].strip('/'))
+    if subrank == 0:
+        print('Starting task with index %d in param file %d at %s' % (idx, argnumber, datetime.now().strftime("%H:%M:%S"))) 
     #dir_logger = logger.bind(logid = argnumber)
     #dir_logger.debug('Starting task %d of %s' % (idx, arg_file))
     start = time.time()
@@ -87,8 +91,10 @@ def mpi_main(task_tuple):
         rmanager.add_child(results_dict, idx = idx)
 
     f.close_read()
-    print('Total time: %f' % (time.time() - start))
+    if subrank == 0:
+        print('Total time: %f' % (time.time() - start))
     #dir_logger.debug('Task completed!')
+    return None
 
 def arrange_tasks(dirs):
 
@@ -117,6 +123,9 @@ def arrange_tasks(dirs):
         
         for idx in todo:
             task_list.append((rmanager, arg_file, idx))
+    print('%d Tasks assembled' % len(task_list))
+    
+    print('%d Tasks to be distributed' % len(task_list))
 
     return task_list
 
@@ -127,7 +136,31 @@ def init_loggers(dirlist):
         # Create a sink with a filter that matches the logid
         #logger.add('%s/log' % dir_, filter=lambda record: record['extra'].get('logid') == argnumber)
         # logger.add('%s/log' % dir_)
-        
+
+def manage_comm2():
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
+    numproc = comm.Get_size()
+
+    if args.comm_splits is None:
+        if args.exp_type in ['UoILasso', 'UoIElasticNet']:
+            comm_splits = 2
+        else:
+            comm_splits = numproc
+    else:
+        comm_splits = args.comm_splits
+
+    # Use array split to do comm.split
+
+    # Take the root node and set it aside - this is what schwimmbad will use to coordinate
+    # the other groups
+
+    ranks = np.arange(numproc)
+    split_ranks = np.array_split(ranks, comm_splits)
+    color = [i for i in np.arange(comm_splits) if rank in split_ranks[i]][0]
+ 
+    return comm, color, split_ranks 
+    
 def manage_comm():
 
     '''Create a comm object and split it into the appropriate number of subcomms'''
@@ -175,8 +208,11 @@ def gen_data_(params, subcomm, subrank):
 
     if subrank == 0:
         # Generate covariance according to index
-        sigma, cov_params = load_covariance(params['cov_idx'])
-
+        if 'cov_idx' in params.keys():
+            sigma, cov_params = load_covariance(params['cov_idx'])
+        else:
+            cov_params = params['cov_params']
+            sigma = gen_covariance(params['n_features'], **params['cov_params'])
         # Sparsify the beta - seed with the block size
         beta = sparsify_beta(params['betadict']['beta'], cov_params['block_size'],
                              params['sparsity'], seed=cov_params['block_size'])
@@ -231,7 +267,7 @@ if __name__ == '__main__':
     total_start = time.time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('dirlist')
+    parser.add_argument('taskfile')
     parser.add_argument('exp_type', default = 'UoILasso')
     parser.add_argument('--comm_splits', type=int, default = None)
     parser.add_argument('-t', '--test', action = 'store_true')
@@ -241,28 +277,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Create subcommunicators as needed
-    comm, rank, color, subcomm, subrank, root_comm = manage_comm()
-    print('rank: %d, color %d: subrank %d' % (rank, color, subrank))
-    with open(args.dirlist, 'rb') as f:
-        dirlist = pickle.load(f)
-    
-    # init_loggers(dirlist)
+    # comm, rank, color, subcomm, subrank, root_comm = manage_comm()
+    comm, color, subgroups = manage_comm2()
 
-    if rank == 0:
-        task_list = arrange_tasks(dirlist)
+    if comm.rank == 0:
+        with open(args.taskfile, 'rb') as f:
+            task_list = pickle.load(f)
+            task_list = task_list[0:100]
     else:
         task_list = None
 
-    task_list = comm.bcast(task_list, root=0)
-
-    if subrank == 0:
-        pool = MPIPool(root_comm)
-
-        # requires our fork of schwimmbad
-        pool.map(mpi_main, task_list, fargs=(color,))
-
-        if not pool.is_master():
-            pool.wait()
-            sys.exit(0)
-
-        pool.close()
+    pool = MPIPool(comm, subgroups=subgroups)
+    # requires our fork of schwimmbad
+    pool.map(mpi_main, task_list)       
+    pool.close()

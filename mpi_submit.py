@@ -17,7 +17,7 @@ from mpi_utils.ndarray import Bcast_from_root, Gatherv_rows, Gather_ndlist
 from job_utils.results import  ResultsManager
 from job_utils.idxpckl import Indexed_Pickle
 
-from utils import sparsify_beta, gen_data
+from utils import sparsify_beta, gen_data, gen_covariance
 from expanded_ensemble import load_covariance
 from results_manager import init_results_container, calc_result
 
@@ -64,7 +64,11 @@ def gen_data_(params, subcomm, subrank):
 
     if subrank == 0:
         # Generate covariance according to index
-        sigma, cov_params = load_covariance(params['cov_idx'])
+        if 'cov_idx' in params.keys():
+            sigma, cov_params = load_covariance(params['cov_idx'])
+        else:
+            cov_params = params['cov_params']
+            sigma = gen_covariance(params['n_features'], **params['cov_params'])
 
         # Sparsify the beta - seed with the block size
         beta = sparsify_beta(params['betadict']['beta'], cov_params['block_size'],
@@ -126,6 +130,7 @@ def main(args):
     n_features = f.header['n_features']
     selection_methods = f.header['selection_methods']
     fields = f.header['fields']
+
 
     exp_type = args.exp_type
     results_dir = args.results_dir

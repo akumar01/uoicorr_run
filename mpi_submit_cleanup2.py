@@ -21,8 +21,6 @@ from job_utils.idxpckl import Indexed_Pickle
 from utils import sparsify_beta, gen_data
 from expanded_ensemble import load_covariance
 from results_manager import init_results_container, calc_result
-
-from schwimmbad import MPIPool
 # from loguru import logger
 
 print('Import time: %f' % (time.time() - t0))
@@ -38,8 +36,7 @@ def mpi_main(task_tuple, subcomm):
     exp_type = args.exp_type
     results_dir = rmanager.directory
 
-    argnumber = int(results_dir.split('_')[-1])
-    print(argnumber) 
+    argnumber = int(results_dir.split('_')[-1]) 
     #dir_logger = logger.bind(logid = argnumber)
     #dir_logger.debug('Starting task %d of %s' % (idx, arg_file))
     start = time.time()
@@ -87,7 +84,8 @@ def mpi_main(task_tuple, subcomm):
         rmanager.add_child(results_dict, idx = idx)
 
     f.close_read()
-    print('Total time: %f' % (time.time() - start))
+    if subcomm.rank == 0:
+        print('Total time: %f' % (time.time() - start))
     #dir_logger.debug('Task completed!')
         
 def manage_comm():
@@ -206,7 +204,7 @@ if __name__ == '__main__':
     comm, rank, color, subcomm, subrank, root_comm = manage_comm()
     print('rank: %d, color %d: subrank %d' % (rank, color, subrank))
     if rank == 0:
-        with open(args.dirlist, 'rb') as f:
+        with open(args.tasklist, 'rb') as f:
             tasklist = pickle.load(f)
     else:
         tasklist = None
@@ -217,4 +215,6 @@ if __name__ == '__main__':
     tasklist_chunked = np.array_split(tasklist, args.comm_splits)
 
     for task in tasklist_chunked[color]:
+        if subrank == 0:
+            print('%s, %s' % (task[1], task[2]))
         mpi_main(task, subcomm)

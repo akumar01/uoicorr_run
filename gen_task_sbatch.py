@@ -1,9 +1,10 @@
 import sys, os
+import glob
 import numpy as np 
 import pickle 
 
 task_path = sys.argv[1]
-n_nodes = int(sys.arv[2])
+n_nodes = int(sys.argv[2])
 job_time = sys.argv[3]
 exp_type = 'UoILasso'
 
@@ -12,9 +13,8 @@ tasklists = glob.glob('%s/*' % task_path)
 sbname = 'cleanup_tasks.sh'
 jobname = 'uoi_cleanup'
 
-
 # Each param file has access to this many nodes
-nodes_per_file = max(1, np.floor(n_nodes/len(tasklist)).astype(int))
+nodes_per_file = max(1, np.floor(n_nodes/len(tasklists)).astype(int))
 
 # We will take the metadata from the first element in the
 # sbatch array chunk
@@ -50,7 +50,7 @@ with open(sbname, 'w') as sb:
     for i, tasklist in enumerate(tasklists):
 
         comm_splits = 4
-        sb.write('srun -N %d -n %d -c 4 --cpu-bind=threads python -u %s/%s %s %s %s --comm_splits=%d &\n' % \
+        sb.write('srun -N %d -n %d -c 4 --cpu-bind=threads python -u %s/%s %s %s --comm_splits=%d &\n' % \
                 (nodes_per_file, 64 * nodes_per_file,
                 script_dir, script, tasklist, exp_type,
                 comm_splits))
