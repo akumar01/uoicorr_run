@@ -9,7 +9,6 @@ import sqlalchemy
 from mpi4py import MPI
 from schwimmbad import MPIPool
 
-
 from utils import gen_data, gen_covariance, sparsify_beta, gen_beta2
 
 sys.path.append('/global/homes/a/akumar25/repos/uoicorr_analysis')
