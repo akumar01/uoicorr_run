@@ -7,13 +7,15 @@ import pickle
 from utils import gen_covariance
 import glob
 
-def load_covariance(index, path=os.environ['HOME'] + '/repos'):
+PATH = os.path.split(os.path.realpath(__file__))[0]
+
+def load_covariance(index):
 
     p = 500
     
     # Load the orignal set of covariance parameters
-    with open('%s/uoicorr_run/unique_cov_param.dat' % path, 'rb') as f:
-       cov_params = pickle.load(f)
+    with open('%s/unique_cov_param.dat' % PATH, 'rb') as f:
+        cov_params = pickle.load(f)
 
     if index < 80:
         sigma = gen_covariance(500, **cov_params[index])
@@ -21,7 +23,7 @@ def load_covariance(index, path=os.environ['HOME'] + '/repos'):
     else:
 
         # Load the indicies that constrain the random perturbations
-        with open('%s/uoicorr_run/ensemble_expansion_indices' % path, 'rb') as f:
+        with open('%s/ensemble_expansion_idxs.dat' % PATH, 'rb') as f:
             expansion_idxs = pickle.load(f)
 
         index = index - 80

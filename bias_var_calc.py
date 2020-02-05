@@ -6,6 +6,7 @@ import time
 import pdb
 import pandas as pd
 import sqlalchemy
+import h5py
 from mpi4py import MPI
 from schwimmbad import MPIPool
 
@@ -24,6 +25,15 @@ class Agrregator():
     def __call__(self, result):
 
         self.result_list.append(result)
+
+    def map(self, task):
+
+        # Replace the index with a sliced dataframe
+        group_idx, dframe_name, beta_file = task
+        dframe = dframes[dframe_names.index(dframe_name)]
+        df = dframe.iloc[20 * group_idx:20 * (group_idx + 1)]
+        assert(np.unique(df['cov_idx'].values).size == 1)
+        return (df, dframe_name, beta_file)
 
     def save(self):
         result_df = pd.DataFrame(self.result_list)
@@ -78,10 +88,10 @@ if __name__ == '__main__':
 
     if comm.rank == 0:
         # Read the non-concatenated dataframes to ensure indices are properly preserved
-        lasso = pd.read_pickle('%s/finalfinal/lasso_df.dat' % root_dir)
-        mcp = pd.read_pickle('%s/finalfinal/mcp_df.dat' % root_dir)
-        scad = pd.read_pickle('%s/finalfinal/scad_df.dat' % root_dir)
-        en = pd.read_pickle('%s/finalfinal/en_df.dat' % root_dir)
+        lasso = pd.read_pickle('%s/lasso_df.dat' % root_dir)
+        mcp = pd.read_pickle('%s/mcp_df.dat' % root_dir)
+        scad = pd.read_pickle('%s/scad_df.dat' % root_dir)
+        en = pd.read_pickle('%s/en_df.dat' % root_dir)
 
         # Remove the parasitic index field
         lasso = lasso.drop('index', axis=1)
@@ -104,27 +114,20 @@ if __name__ == '__main__':
         np_ratio = 4
         cov_idxs = np.arange(80)
 
-        beta_fnames = ['%s/finalfinal/%s_pp_beta.h5' % (root_dir, dfname) for dfname in ['lasso', 'mcp', 'scad', 'en']]
+        beta_fnames = ['%s/%s_pp_beta.h5' % (root_dir, dfname) for dfname in ['lasso', 'mcp', 'scad', 'en']]
         beta_files = [h5py.File(beta_fname, 'r') for beta_fname in beta_fnames]
-
-        param_combos = list(itertools.product(sparsity, betawidth, selection_methods, cov_idxs))
 
         # Arrange tasks from param combos 
         task_list = []
         for i, dframe in enumerate(dframes):
-            for param_comb in param_combos:
-                s, bw, sm, cidx = param_combo
-                df = apply_df_filters(dframe, sparsity=s, betawidth=bw, 
-                                          selection_method=sm, cov_idx=cidx, kappa=kappa, np_ratio=np_ratio)
-                if df.shape[0] == 0:
-                    continue
-                else:
-                    assert(df.shape[0] == 20)
-                task_list.append((df, dframe_names[i], beta_files[i]))
+            dframe = apply_df_filters(dframe, kappa=kappa, np_ratio=np_ratio)
+            dframe.sort_values(inplace=True, by=['selection_method', 'betawidth', 'sparsity', 'cov_idx'])
+            assert(dframe.shape[0] % 20 == 0)
+            for j in np.arange(dframe.shape[0]/20, dtype=int)
+                task_list.append((j, dframe_names[i], beta_files[i]))
     else:
-
         task_list = None
 
     aggregator = Aggregator()
-    pool.map(task_list, calc_bias_var, callback=aggregator)
+    pool.map(task_list, calc_bias_var, callback=aggregator, map_fn=aggregator.map)
     pool.close()
