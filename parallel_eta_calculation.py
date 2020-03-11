@@ -4,13 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import pdb
-import itertools 
+import itertools
+from sklearn.preprocessing import StandardScaler
+ 
 # Add the uoicorr directory to the path
 sys.path.append('/global/homes/a/akumar25/repos/uoicorr_analysis')
 
 from postprocess_utils import *
 import pandas as pd
 import sqlalchemy
+
+from mpi4py import MPI
 
 from utils import gen_data, gen_covariance, sparsify_beta, gen_beta2
 from expanded_ensemble import load_covariance
@@ -52,7 +56,8 @@ class Worker():
                     np.random.seed(int(_df_['seed']))
                     X = np.random.multivariate_normal(mean = np.zeros(_df_['n_features']), cov=sigma, 
                                                       size=_df_['np_ratio'] * _df_['n_features'])
-                    sigma_hat = X.T @ X
+                    X = StandardScaler().fit_transform(X)
+                    sigma_hat = 1/X.shape[0] * X.T @ X
                     eta_[j] = calc_irrep_const(sigma_hat, k)
                     
                 eta[i] = np.nanmean(eta_)
@@ -68,73 +73,96 @@ class Worker():
         
         return eta, sa
 
+def validate_cov_idxs(df):
+    vals = np.array(df['cov_idx'].values)
+    split_vals = np.array_split(vals, int(vals.size/20))
+    split_var = [np.var(split) for split in split_vals]
+    assert(max(split_var) == 0)
+    
 
 if __name__ == '__main__':
 
-comm = MPI.COMM_WORLD
+    comm = MPI.COMM_WORLD
 
-# Load dataframes and narrow down their scope
-if comm.rank == 0:
+    kappa = 5
+    np_ratio = 4
 
-    selection_methods = ['BIC', 'AIC', 'CV']
-    lasso = pd.read_pickle('%s/finalfinal/lasso_concat_df.dat' % root_dir)
-    mcp = pd.read_pickle('%s/finalfinal/mcp_concat_df.dat' % root_dir)
-    scad = pd.read_pickle('%s/finalfinal/scad_concat_df.dat' % root_dir)
-    en = pd.read_pickle('%s/finalfinal/en_concat_df.dat' % root_dir)
+    root_dir = os.environ['SCRATCH'] + '/finalall'
+    save_dir = os.environ['SCRATCH'] + '/etascaling'
+ 
+    # Load dataframes and narrow down their scope
+    if comm.rank == 0:
+        
+    
+        selection_methods = ['BIC', 'AIC', 'CV']
+        lasso = pd.read_pickle('%s/lasso_concat_df.dat' % root_dir)
+        mcp = pd.read_pickle('%s/mcp_concat_df.dat' % root_dir)
+        scad = pd.read_pickle('%s/scad_concat_df.dat' % root_dir)
+        en = pd.read_pickle('%s/en_concat_df.dat' % root_dir)
+        uoi = pd.read_pickle('%s/uoi_concat_df.dat' % root_dir)
 
-    # Narrow down the size
-    lasso = apply_df_filters(lasso, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)
-    mcp = apply_df_filters(mcp, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)    
-    scad = apply_df_filters(scad, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)    
-    en = apply_df_filters(en, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)
 
-    lasso = lasso[lasso['selection_method'].isin(selection_methods)]
-    mcp = mcp[mcp['selection_method'].isin(selection_methods)]
-    scad = scad[scad['selection_method'].isin(selection_methods)]
-    en = en[en['selection_method'].isin(selection_methods)]
+        # Narrow down the size
+        lasso = apply_df_filters(lasso, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)
+        mcp = apply_df_filters(mcp, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)    
+        scad = apply_df_filters(scad, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)    
+        en = apply_df_filters(en, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)
+        uoi = apply_df_filters(uoi, kappa=kappa, np_ratio=np_ratio, betawidth=np.inf)
 
-    sparsity = np.unique(lasso['sparsity'].values)
+        lasso = lasso[lasso['selection_method'].isin(selection_methods)]
+        mcp = mcp[mcp['selection_method'].isin(selection_methods)]
+        scad = scad[scad['selection_method'].isin(selection_methods)]
+        en = en[en['selection_method'].isin(selection_methods)]
+        uoi = uoi[uoi['selection_method'].isin(selection_methods)]
 
-    # Sort dataframes hierarchally
-    lasso.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
-    mcp.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
-    scad.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
-    en.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
-    dframes = [lasso, mcp, scad, en]
+        sparsity = np.unique(lasso['sparsity'].values)
 
-    assert(np.all([df.shape[0] % 20 == 0 for df in dframes]))
+        # Sort dataframes hierarchally
+        lasso.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
+        mcp.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
+        scad.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
+        en.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
+        uoi.sort_values(inplace=True, by=['selection_method', 'sparsity', 'cov_idx'])
 
-else:
+        dframes = [lasso, mcp, scad, en, uoi]
+        [validate_cov_idxs(df) for df in dframes]
+        assert(np.all([df.shape[0] % 20 == 0 for df in dframes]))
 
-    dframes = None
-    sparsity = None
+    else:
 
-dframes = comm.bcast(dframes)
-sparsity = comm.bcast(sparsity)
-dframe_names = ['Lasso', 'MCP', 'SCAD', 'EN']
+        dframes = None
+        sparsity = None
 
-tasklist = []
-for i, df in enumerate(dframes):
-    for j in np.arange(int(dframes[0].shape[0]/20)):
-        tasklist.append((i, j))
+    dframes = comm.bcast(dframes)
+    sparsity = comm.bcast(sparsity)
+    dframe_names = ['Lasso', 'MCP', 'SCAD', 'EN', 'UoI Lasso']
 
-# Initialize worker classes
-worker = Worker()
+    tasklist = []
+    for i, df in enumerate(dframes):
+        for idx_set in np.array_split(np.arange(df.shape[0]), int(df.shape[0]/20)):
+            tasklist.append((i, idx_set))
 
-task_chunks = np.array_split(tasklist, comm.size)
-eta_datalist = []
-for task in task_chunks[comm.rank]:
-    t0 = time.time()
-    i, j = task
-    df = dframes[i].iloc[20*j:20*(j + 1)]
-    cov_indices = np.unique(df['cov_idx'].values)
-    assert(cov_indices.size == 1)
+    # Initialize worker classes
+    worker = Worker()
 
-    eta, sa = worker.calc_eta_sa(cov_indices, df, flag=None)
-    bw = df.iloc[0]['betawidth']
-    sparsity = df.iloc[0]['sparsity']
-    sm = df.iloc[0]['selection_method']
-    eta_datalist.append({'df_name' : dframe_names[i], 'betawidth': bw, 'sparsity' : s,
-                       'eta': eta_, 'sa': sa_, 'selection_method': sm})       
+    print(len(tasklist))
+    task_chunks = np.array_split(tasklist, comm.size)
+    eta_datalist = []
+    for task in task_chunks[comm.rank]:
+        t0 = time.time()
+        i, idx_set = task
+        df = dframes[i].iloc[idx_set]
+        cov_indices = np.unique(df['cov_idx'].values)
+        assert(cov_indices.size == 1)
 
-    print('Task exec time: %f' % (time.time() - t0))
+        eta, sa = worker.calc_eta_sa(cov_indices, df, flag=None)
+        bw = df.iloc[0]['betawidth']
+        sparsity = df.iloc[0]['sparsity']
+        sm = df.iloc[0]['selection_method']
+        eta_datalist.append({'df_name' : dframe_names[i], 'betawidth': bw, 'sparsity' : sparsity,
+                           'eta': eta, 'sa': sa, 'selection_method': sm, 'cov_idx' : cov_indices[0]})       
+
+        print('Task exec time: %f' % (time.time() - t0))
+    
+    with open('%s/eta_datalist%d.dat' % (save_dir, comm.rank), 'wb') as f:
+        f.write(pickle.dumps(eta_datalist))
