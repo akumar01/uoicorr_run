@@ -160,10 +160,10 @@ if __name__ == '__main__':
         i, sm, s = task        
         df = apply_df_filters(dframes[i], selection_method=sm,  sparsity=s)
         cov_indices = np.unique(df['cov_index'].values)
-        eta, sa, saprcnt, FNR, FPR = worker.calc_eta_sa(cov_indices, df)
+        eta, sa, FNR, FPR, sa_perf, sa_thresh = worker.calc_eta_sa(cov_indices, df)
         eta_datalist.append({'df_name' : dframe_names[i], 'betawidth': np.inf, 'sparsity' : s,
                              'eta': eta, 'sa': sa, 'selection_method': sm, 'cov_indices' : cov_indices,
-                             'saprcnt': saprcnt, 'FNR': FNR, 'FPR': FPR})       
+                             'sa_perf': sa_perf, 'sa_thresh': sa_thresh, 'FNR': FNR, 'FPR': FPR})       
         print('Task exec time: %f' % (time.time() - t0))
     
     with open('%s/eta_datalist%d.dat' % (save_dir, comm.rank), 'wb') as f:
