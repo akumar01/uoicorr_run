@@ -40,11 +40,14 @@ class Worker():
         sa = np.zeros(len(cov_indices))
         FNR = np.zeros(len(cov_indices))
         FPR = np.zeros(len(cov_indices))
-        saprcnt = np.zeros(len(cov_indices))
+        sa_perfect = np.zeros(len(cov_indices))
+        sa_thresh = np.zeros(len(cov_indices))
 
         for i, cov_idx in enumerate(cov_indices):
             sigma, cov_param = self.cov_params[cov_idx]
-            df_ = apply_df_filters(df, cov_idx=cov_idx)                
+            df_ = apply_df_filters(df, cov_idx=cov_idx)         
+            assert(df_.shape[0] == 20)       
+            
             # take the minimum non-zero beta value - magnitudes don't matter
             beta = np.ones(df_.iloc[0]['n_features'])               
             # Sparsify beta
@@ -76,10 +79,11 @@ class Worker():
             FNR[i] = np.mean(df_['FNR'].values)
             FPR[i] = np.mean(df_['FPR'].values)
 
-            if flag == 'threshold':
-                sa[i] = np.count_nonzero(1 * df_['sa'].values > threshold)/len(cov_indices[i])
+            # TODO: Count the number out of twenty that do perfectly
+            sa_perfect[i] = np.count_nonzero(1 * np.isclose(df_['sa'].values, np.ones(df_['sa'].size)))/df_['sa'].size
+            sa_thresh[i] = np.count_nonzero(1 * (df_['sa'].values > 0.8))/df_['sa'].size
         
-        return eta, sa
+        return eta, FNR, FPR, sa_perfect, sa_thresh
 
 
 if __name__ == '__main__':
@@ -158,8 +162,8 @@ if __name__ == '__main__':
         cov_indices = np.unique(df['cov_index'].values)
         eta, sa, saprcnt, FNR, FPR = worker.calc_eta_sa(cov_indices, df)
         eta_datalist.append({'df_name' : dframe_names[i], 'betawidth': np.inf, 'sparsity' : s,
-                           'eta': eta, 'sa': sa, 'selection_method': sm, 'cov_indices' : cov_indices,
-                            'saprcnt': saprcnt, 'FNR': FNR, 'FPR': FPR})       
+                             'eta': eta, 'sa': sa, 'selection_method': sm, 'cov_indices' : cov_indices,
+                             'saprcnt': saprcnt, 'FNR': FNR, 'FPR': FPR})       
         print('Task exec time: %f' % (time.time() - t0))
     
     with open('%s/eta_datalist%d.dat' % (save_dir, comm.rank), 'wb') as f:
