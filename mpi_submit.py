@@ -131,7 +131,6 @@ def main(args):
     selection_methods = f.header['selection_methods']
     fields = f.header['fields']
 
-
     exp_type = args.exp_type
     results_dir = args.results_dir
 

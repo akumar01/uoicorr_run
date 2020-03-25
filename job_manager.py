@@ -339,7 +339,7 @@ def gen_sbatch_multinode(sbatch_array, sbatch_dir, script_dir, n_nodes, srun_fla
                 # Allocate 50 threads for parallelizing UoI itself, use this to determine comm_splits 
                 if task['exp_type'] == 'UoILasso':
                     # comm_splits = np.floor(68 * nodes_per_file/25).astype(int)
-                    comm_splits = 4
+                    comm_splits = 25
                     if shifter:
                         sb.write('srun -N %d -n %d -c 4 shifter --entrypoint python -u %s/%s %s %s %s --comm_splits=%d %s &\n' % \
                                  (nodes_per_file, 68 * nodes_per_file,
