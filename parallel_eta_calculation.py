@@ -44,9 +44,16 @@ class Worker():
         sa_thresh = np.zeros(len(cov_indices))
 
         for i, cov_idx in enumerate(cov_indices):
+            t0 = time.time()
             sigma, cov_param = self.cov_params[cov_idx]
             df_ = apply_df_filters(df, cov_idx=cov_idx)         
-            assert(df_.shape[0] == 20)       
+            if df_.shape[0] == 0:
+                eta[i] = np.nan
+                sa[i] = np.nan
+                FNR[i] = np.nan
+                FPR[i] = np.nan 
+                sa_perfect[i] = np.nan
+                sa_thresh[i] = np.nan       
             
             # take the minimum non-zero beta value - magnitudes don't matter
             beta = np.ones(df_.iloc[0]['n_features'])               
@@ -67,6 +74,8 @@ class Worker():
                     X = np.random.multivariate_normal(mean = np.zeros(_df_['n_features']), cov=sigma, 
                                                       size=_df_['np_ratio'] * _df_['n_features'])
                     X = StandardScaler().fit_transform(X)
+                    # Columns have mean squared one
+                    X *= 1/np.linalg.norm(X, axis = 0)
                     sigma_hat = 1/X.shape[0] * X.T @ X
                     eta_[j] = calc_irrep_const(sigma_hat, k)
                     
@@ -82,8 +91,8 @@ class Worker():
             # TODO: Count the number out of twenty that do perfectly
             sa_perfect[i] = np.count_nonzero(1 * np.isclose(df_['sa'].values, np.ones(df_['sa'].size)))/df_['sa'].size
             sa_thresh[i] = np.count_nonzero(1 * (df_['sa'].values > 0.8))/df_['sa'].size
-        
-        return eta, FNR, FPR, sa_perfect, sa_thresh
+            # print('Per cov_idx iteration time: %f' % (time.time() - t0))
+        return eta, sa, FNR, FPR, sa_perfect, sa_thresh
 
 
 if __name__ == '__main__':
@@ -93,14 +102,14 @@ if __name__ == '__main__':
     root_dir = os.environ['SCRATCH'] + '/finalall'
     save_dir = os.environ['SCRATCH'] + '/etascaling'
 
-    caseno = sys.argv[1]
+    # caseno = sys.argv[1]
  
-    if caseno == 4:
-        kappa = 5
-        np_ratio = 4
-    elif caseno == 3:
-        kappa = 10
-        np_ratio = 16
+    #if caseno == 4:
+    kappa = 10
+    np_ratio = 16
+    # elif caseno == 3:
+    #    kappa = 10
+    #    np_ratio = 16
 
     # Load dataframes and narrow down their scope
     if comm.rank == 0:
@@ -111,20 +120,6 @@ if __name__ == '__main__':
         scad = pd.read_pickle('%s/scad_concat_df.dat' % root_dir)
         en = pd.read_pickle('%s/en_concat_df.dat' % root_dir)
         uoi = pd.read_pickle('%s/uoi_concat_df.dat' % root_dir)
-
-        # Remove the parasitic index field
-        uoi = uoi.drop('index', axis=1)
-        lasso = lasso.drop('index', axis=1)
-        mcp = mcp.drop('index', axis=1)
-        scad = scad.drop('index', axis=1)
-        en = en.drop('index', axis=1)
-
-        # Replace with a robust index
-        uoi.set_index(np.arange(uoi.shape[0]), inplace=True)
-        lasso.set_index(np.arange(lasso.shape[0]), inplace=True)
-        mcp.set_index(np.arange(mcp.shape[0]), inplace=True)
-        scad.set_index(np.arange(scad.shape[0]), inplace=True)
-        en.set_index(np.arange(en.shape[0]), inplace=True)
 
         sparsity = np.unique(uoi['sparsity'].values)
         # Only need to do a single betawidth
@@ -144,10 +139,10 @@ if __name__ == '__main__':
     sparsity = comm.bcast(sparsity)
     selection_methods = comm.bcast(selection_methods)
 
-    betawidth = np.inf
+    betawidth = 0.1
     dframe_names = ['Lasso', 'MCP', 'SCAD', 'EN', 'UoI Lasso']
 
-    tasklist = itertools.product(np.arange(len(dframes)), selection_methods, sparsity)
+    tasklist = list(itertools.product(np.arange(len(dframes)), selection_methods, sparsity))
 
     # Initialize worker classes
     worker = Worker()
@@ -155,16 +150,19 @@ if __name__ == '__main__':
     print(len(tasklist))
     task_chunks = np.array_split(tasklist, comm.size)
     eta_datalist = []
-    for task in task_chunks[comm.rank]:
+    for j, task in enumerate(task_chunks[comm.rank]):
         t0 = time.time()
-        i, sm, s = task        
+        i, sm, s = task 
+        i = int(i)
+        s = float(s) 
         df = apply_df_filters(dframes[i], selection_method=sm,  sparsity=s)
-        cov_indices = np.unique(df['cov_index'].values)
+        cov_indices = np.unique(df['cov_idx'].values)
+        cov_indices = cov_indices[cov_indices < 80]
         eta, sa, FNR, FPR, sa_perf, sa_thresh = worker.calc_eta_sa(cov_indices, df)
-        eta_datalist.append({'df_name' : dframe_names[i], 'betawidth': np.inf, 'sparsity' : s,
+        eta_datalist.append({'df_name' : dframe_names[i], 'betawidth': 0.1, 'sparsity' : s,
                              'eta': eta, 'sa': sa, 'selection_method': sm, 'cov_indices' : cov_indices,
                              'sa_perf': sa_perf, 'sa_thresh': sa_thresh, 'FNR': FNR, 'FPR': FPR})       
-        print('Task exec time: %f' % (time.time() - t0))
+        print('Task %d/%d exec time: %f' % (j + 1, len(task_chunks[comm.rank]), time.time() - t0))
     
     with open('%s/eta_datalist%d.dat' % (save_dir, comm.rank), 'wb') as f:
         f.write(pickle.dumps(eta_datalist))

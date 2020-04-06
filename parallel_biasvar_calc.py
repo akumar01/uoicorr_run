@@ -37,7 +37,13 @@ def calc_bias_var(beta_file, bids):
     # Common support bias
     for i in range(bids.size):
         common_support = list(set(np.nonzero(beta[i, :])[0]).intersection(set(np.nonzero(beta_hats[i, :])[0])))
-        common_support_bias += 1/bids.size * np.linalg.norm(beta[i, common_support] - beta_hats[i, common_support])
+        # Nothing correctly selected
+        if len(common_support) == 0:
+            common_support_bias = np.nan
+        else:
+            common_support_bias += 1/len(common_support) * np.linalg.norm(beta[i, common_support] - beta_hats[i, common_support])
+    
+    common_support_bias *= 1/bids.size
     variance = np.mean(np.var(beta_hats, axis = 0))
     
     return total_bias, common_support_bias, variance
@@ -45,20 +51,19 @@ def calc_bias_var(beta_file, bids):
 
 if __name__ == '__main__':
 
-    # Key of the uid_groups dictionary to process
-	df_name = sys.argv[1]
+    root_dir = os.environ['SCRATCH'] + '/finalfinal'
+    # Create communicator objects
+    comm = MPI.COMM_WORLD
 
-	root_dir = os.environ['SCRATCH'] + '/finaluids'
-	# Create communicator objects
-	comm = MPI.COMM_WORLD
+    df_name = 'SCAD'
 
     if comm.rank == 0:
 
-	   # Load the uid groups
+       # Load the uid groups
         with open('uid_groups1.dat', 'rb') as f:
             uid_groups = pickle.load(f)
 
-        split_size = np.ceil(len(uid_groups[df_name])/comm.size)
+        split_size = int(np.ceil(len(uid_groups[df_name])/comm.size))
 
         # Assemble tasks and then distribute:
         tasklist = [chunk for chunk in dict_chunker(uid_groups[df_name], split_size)]
@@ -68,21 +73,25 @@ if __name__ == '__main__':
     else:
         tasks = comm.recv(source=0, tag=11)
 
-    beta_file = h5py.File('%s/%s_pp_beta.h5', 'r')
+    beta_file = h5py.File('%s/scad_pp_beta.h5' % root_dir , 'r')
 
     bias_var_datalist = []
 
-    # Tasks are a dictionary. Iterate over the keys:
-    for uid, bids in tasks.items():
+    print('Rank %d has %d tasks' % (comm.rank, len(tasks)))
 
-        total_bias, common_support_bias, variance = calc_bias_var
+    # Tasks are a dictionary. Iterate over the keys:
+    task_counter = 0
+    for uid, bids in tasks.items():
+        t0 = time.time()
+        total_bias, common_support_bias, variance = calc_bias_var(beta_file, bids)
         bias_var_datalist.append({'uid': uid, 'total_bias': total_bias, 'common_bias': common_support_bias,
                                   'variance': variance})
+        print('Rank %d completes task %d in %f s' % (comm.rank, task_counter, time.time() - t0))
+        task_counter += 1   
 
     bias_var_datalist = comm.gather(bias_var_datalist)
 
-    if rank == 0:
-        with open('biasvar_calc_%s.dat' % df_name, 'wb') as f:
+    if comm.rank == 0:
+        with open('biasvar_calc_scad.dat', 'wb') as f:
             f.write(pickle.dumps(bias_var_datalist))
 
-        

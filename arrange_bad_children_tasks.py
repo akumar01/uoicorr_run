@@ -24,7 +24,7 @@ def arrange_tasks(bad_children, root_dir, exp_type):
 
     return task_list
 
- if __name__ == '__main__':
+if __name__ == '__main__':
  
     parser = argparse.ArgumentParser()
     parser.add_argument('source_dir')
