@@ -5,6 +5,31 @@ import pdb
 import traceback
 import time
 
+# Sample from 1/Exp[-Abs|x|], properly normalized
+def invexp_dist(low, high, n_samples):
+
+    x = np.linspace(low, high, 10000)
+    fx = np.exp(np.abs(x))
+
+    # normalize
+    fx = fx/np.sum(fx)
+
+    # CDF
+    Fx = np.cumsum(fx)
+
+    # generate uniform random variables
+    u = np.random.uniform(size = n_samples)
+
+    # Apply the inverse CDF
+    y = np.array([])
+    for ux in u:
+            y = np.append(y, x[np.argwhere(Fx == min(Fx[(Fx - ux) > 0])).ravel()])
+
+    y = np.reshape(y, (n_samples, 1))
+
+    return y
+
+
 def gen_beta(n_features = 60, block_size = 6, sparsity = 0.6, betadist = 'uniform'):
     n_blocks = int(np.floor(n_features/block_size))
 
@@ -39,7 +64,7 @@ def gen_beta(n_features = 60, block_size = 6, sparsity = 0.6, betadist = 'unifor
 # A betawidth of inf is a uniform distribution on the range 0-10
 def gen_beta2(n_features = 60, block_size = 10, sparsity = 0.6,
             betawidth = np.inf, sparsity_profile = 'uniform',
-            n_active_blocks = None, seed = None, distribution='normal'):
+        n_active_blocks = None, seed = None, distribution='normal'):
     n_blocks = int(np.floor(n_features/block_size))
 
     n_nonzero_beta = int(sparsity * block_size)
@@ -410,6 +435,8 @@ def gen_avg_covariance(cov_type, avg_cov = 0.1, n_features = 60, **kwargs):
 
 def gen_covariance(n_features, correlation, block_size, L, t, variance = 1):
 
+    block_size = int(block_size)
+
     s0 = block_covariance(n_features, correlation, block_size)
     s1 = exp_falloff(n_features, L)
     s = (1 - t) * s0 + t * s1
@@ -498,7 +525,15 @@ def FPR(beta, beta_hat, threshold = False):
 
     return false_positive_rate
 
-def selection_accuracy(beta, beta_hat, threshold = False):
+'''
+    selection_accuracy
+        beta: ndarray (n_models, n_features) or (n_features,)
+        beta_hat : ndarray (n_models, n_features)
+        threshold: Ignore magnitudes less than 1e-6
+        sign_consistent: Assess whether correctly selected coefficients have the
+        the right sign
+'''
+def selection_accuracy(beta, beta_hat, threshold = False, sign_consistent=False):
 
     beta, beta_hat = tile_beta(beta, beta_hat)
 
@@ -521,10 +556,34 @@ def selection_accuracy(beta, beta_hat, threshold = False):
         if normalization == 0:
             normalization = 1
 
-        selection_accuracy[i] = 1 - \
-        float(len((Sb.difference(Sbhat)).union(Sbhat.difference(Sb))))\
-        /float(normalization)
+        # If requiring sign consistency, need to define set intersection
+        # in a sign consistent way
+        if sign_consistent:
+            selection_accuracy[i] = 1 - float(len(sign_consistent_set_diff(Sb, Sbhat, b, bhat)))\
+                                    /float(normalization)            
+        else:
+
+            selection_accuracy[i] = 1 - \
+            float(len((Sb.difference(Sbhat)).union(Sbhat.difference(Sb))))\
+            /float(normalization)
     return selection_accuracy
+
+def sign_consistent_set_diff(S, Shat, b, bhat):
+
+    # Treat incorrect signs as false negatives
+
+    # Treat incorrect signs as false negatives
+    common_support = list(S.intersection(Shat))
+
+    incorrect_signs = [idx for idx in common_support 
+                           if np.sign(b[idx]) != np.sign(bhat[idx])]
+
+    # Remove incorrect signs from Shat
+    for idx in incorrect_signs:
+        Shat.remove(idx)
+
+    # Now take the symmetric set difference
+    return (S.difference(Shat)).union(Shat.difference(S))
 
 # Calculate estimation error
 # Do so using only the overlap of the estimated and true support sets

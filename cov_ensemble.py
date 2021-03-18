@@ -16,7 +16,7 @@ from sklearn.preprocessing import StandardScaler
 
 from mpi_utils.ndarray import Gatherv_rows
 
-from utils import gen_covariance, gen_data, sparsify_beta, get_cov_list
+from utils import gen_covariance, gen_data, sparsify_beta
 
 def bound_eigenvalue(matrix, k):
 

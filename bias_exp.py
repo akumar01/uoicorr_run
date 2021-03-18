@@ -9,11 +9,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LassoCV
 from pyuoi import UoI_Lasso
 from pyc_based.pycasso_cv import PycassoCV
+from r_based.ncvreg import ncvreg, ncvregCV
+
 from utils import gen_covariance, gen_beta2, gen_data, calc_avg_cov, get_cov_list
 
 from mpi4py import MPI
-from schwimmbad import MPIPool
+from schwimmbad import MPIPool, SerialPool
 import itertools
+import hashlib
 
 class Worker(object):
 
@@ -29,7 +32,6 @@ class Worker(object):
         self.task_signature = []
 
     def __call__(self, task_tuple):
-
         cov_param_idx = task_tuple[0]
         rep = task_tuple[1]
         algorithm = task_tuple[2]
@@ -53,42 +55,64 @@ class Worker(object):
         # and then sparsifying as one goes on. Is this reproducible subsequently?
             
         t0 = time.time()
+#        rand_seed = hash((cov_param_idx, rep))  % ((sys.maxsize + 1) * 2)
+        hasher = hashlib.sha1()
+        hasher.update(b'(%d, %d)' % (cov_param_idx, rep))
+        rand_seed = np.frombuffer(hasher.digest(), dtype='uint32')[0]
+        print(rand_seed)
         X, X_test, y, y_test, ss = gen_data(n_samples, n_features, kappa = 5, 
-                                        covariance = sigma, beta = beta_)
+                                        covariance = sigma, beta = beta_, 
+                                        seed=rand_seed)
     
         # Standardize
         X = StandardScaler().fit_transform(X)
-        y -= np.mean(y)
+
+        # Do NOT mean subtract and keep an intercept
 
         if algorithm == 0:
-            lasso = LassoCV(fit_intercept=False, cv=5)
+            lasso = LassoCV(fit_intercept=True, cv=5)
             lasso.fit(X, y.ravel())
             beta_hat = lasso.coef_
 
         elif algorithm == 1:
 
-            uoi = UoI_Lasso(fit_intercept=False, estimation_score='r2')
+            uoi = UoI_Lasso(fit_intercept=True, estimation_score='r2')
             uoi.fit(X, y)
             beta_hat = uoi.coef_        
 
         elif algorithm == 2:        
-            scad = PycassoCV(penalty='scad', fit_intercept=False, nfolds=5, 
+            scad = PycassoCV(penalty='scad', fit_intercept=True, nfolds=5, 
                              n_alphas=100)
             scad.fit(X, y)
             beta_hat = scad.coef_
         
         elif algorithm == 3:
 
-            mcp = PycassoCV(penalty='mcp', fit_intercept=False, nfolds=5,
+            mcp = PycassoCV(penalty='mcp', fit_intercept=True, nfolds=5,
                             n_alphas=100)
 
             mcp.fit(X, y)
             beta_hat = mcp.coef_        
 
+        # ncvreg alternatives
+        elif algorithm == 4:
+
+            scad = ncvregCV(penalty='SCAD', fit_intercept=True, cv=5)
+            scad.fit(X, y)
+            beta_hat = scad.coef_
+
+        elif algorithm == 5:
+
+            mcp = ncvregCV(penalty='MCP', fit_intercept=True, cv=5)
+            mcp.fit(X, y)
+            beta_hat = mcp.coef_
+
         self.beta.append(beta_)
         self.beta_hat.append(beta_hat)
         self.task_signature.append((cov_param_idx, rep, algorithm))
         print('call successful, algorithm %d took %f seconds' % (algorithm, time.time() - t0))
+        return None
+
 if __name__ == '__main__':
 
     n_features = 100
@@ -106,34 +130,47 @@ if __name__ == '__main__':
     cov_list, _ = get_cov_list(n_features, 60, correlation, block_sizes, L, n_supplement = 20)
 
     cov_params = [{'correlation' : t[0], 'block_size' : t[1], 'L' : t[2], 't': t[3]} for t in cov_list]
-
-    nreps = 10
+    cov_params = cov_params[::4]
+    nreps = 100
     # Divide up the tasks
-    comm = MPI.COMM_WORLD
-    rank = comm.rank
-    size = comm.size
-
-    pool = MPIPool(comm)
-
+    # comm = MPI.COMM_WORLD
+    # rank = comm.rank
+    # size = comm.size
+    size = 1
+ 
+    # Switch between MPIPool and Serial Pool    
+    if size > 1:
+        pool = MPIPool(comm)
+    else:
+        pool = SerialPool()
     # Take the outer product over cov_params, reps, and algorithms
     # 0: Lasso
     # 1: UoI
     # 2: SCAD
     # 3: MCP
 
-    tasks = itertools.product(np.arange(len(cov_params)), np.arange(nreps), [0, 1, 2, 3])
+    tasks = list(itertools.product(np.arange(len(cov_params)), np.arange(nreps), [0, 1, 2, 3, 4, 5]))
     worker = Worker(n_features=n_features, n_samples=n_samples, cov_params=cov_params)
-    pool.map(worker, tasks)
+     
+    for task in tasks:
+        worker(task)
+    
+    betas = worker.beta
+    beta_hats = worker.beta_hat
+    task_signatures = worker.task_signature
 
-    pool.close()
-
+      # pool.map(worker, tasks)
+    # pool.wait()
+    # pool.close()
+    # pdb.set_trace()
     # Gather across ranks and save
-    betas = comm.gather(worker.beta, root = 0)
-    beta_hats = comm.gather(worker.beta_hat, root = 0)
-    task_signatures = comm.gather(worker.task-signature, root = 0)
+    # betas = comm.gather(worker.beta, root = 0)
+    # beta_hats = comm.gather(worker.beta_hat, root = 0)
+    # task_signatures = comm.gather(worker.task_signature, root = 0)
 
     # Just save:
-    with open('bias_exp_results.dat', 'wb') as f:
+    with open('bias_exp_results5.dat', 'wb') as f:
         f.write(pickle.dumps(betas))
         f.write(pickle.dumps(beta_hats))
         f.write(pickle.dumps(task_signatures))
+        f.write(pickle.dumps(cov_params))
